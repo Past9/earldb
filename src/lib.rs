@@ -4,7 +4,7 @@ extern crate alloc;
 extern crate core;
 
 use alloc::heap;
-use std::{mem, ptr};
+use std::{mem, ptr, slice};
 
 
 pub trait JournalInterface {
@@ -89,12 +89,22 @@ impl JournalInterface for MemoryJournal {
             ptr::write(self.write_ptr, 0x02);
             self.write_ptr = self.write_ptr.offset(1);
             let len = data.len() as u32;
-            let len_src: *const u8 = mem::transmute(&len);
-            ptr::copy(len_src, self.write_ptr, 4);
+            let len_src: *const u32 = mem::transmute(&len);
+            ptr::copy(len_src, self.write_ptr as *mut u32, 1);
             self.write_ptr = self.write_ptr.offset(4);
-            let data_ref = data.as_ref();
-            let data_ptr: *const u8 = mem::transmute(&data_ref);
+
+            let dest_slice = slice::from_raw_parts_mut(self.write_ptr, len as usize);
+
+            dest_slice.clone_from_slice(data);
+
+
+
+            /*
+            //let data_ref = data.as_ref();
+            let data_pos: usize = data as *const usize as usize;
+            let data_ptr: *const u8 = mem::transmute(data);
             ptr::copy(data_ptr, self.write_ptr, len as usize);
+            */
             self.write_ptr = self.write_ptr.offset(len as isize);
         }
 
@@ -150,8 +160,12 @@ impl JournalInterface for MemoryJournal {
 
         unsafe {
 
+            let mut disp: Vec<u8> = Vec::with_capacity(size + 6);
+            disp.set_len(size + 6);
+            ptr::copy(self.read_ptr, disp.as_mut_ptr(), size + 6);
+
             dst.set_len(size);
-            ptr::copy(self.read_ptr, dst.as_mut_ptr(), size);
+            ptr::copy(self.read_ptr.offset(5), dst.as_mut_ptr(), size);
 
             return Some(dst);
         }
@@ -175,23 +189,19 @@ impl JournalInterface for MemoryJournal {
 
 #[test]
 fn it_works() {
-
     let mut journal = MemoryJournal::new();
 
-    let data: [u8; 4] = [1, 2, 3, 4];
+    let data: [u8; 3] = [1, 2, 3];
     journal.open();
     journal.write(&data);
     journal.commit();
 
     let r = journal.read().unwrap();
 
-    println!("data read: {:?}", r);
-
-    assert_eq!(4, r.len());
+    assert_eq!(3, r.len());
     assert_eq!(1, r[0]);
     assert_eq!(2, r[1]);
     assert_eq!(3, r[2]);
-    assert_eq!(4, r[3]);
 
 }
 
