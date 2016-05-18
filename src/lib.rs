@@ -13,6 +13,8 @@ pub trait JournalInterface {
     fn close(&mut self);
     fn is_open(&self) -> bool;
 
+    fn reset(&mut self);
+
     fn write(&mut self, data: &[u8]);
     fn commit(&mut self);
     fn discard(&mut self);
@@ -32,31 +34,41 @@ pub struct MemoryJournal {
     start_size: usize,
     expand_size: usize,
     cap_bytes: usize,
+    start_ptr: *const u8,
     read_ptr: *mut u8,
     write_ptr: *mut u8
 
 }
 impl MemoryJournal {
-    pub fn new() -> MemoryJournal {
+    pub fn new(
+        start_size: usize,
+        expand_size: usize
+    ) -> MemoryJournal {
 
-        let init_size = 32 * 1024;
 
         unsafe {
-            let mut raw: *mut u8 = mem::transmute(heap::allocate(init_size, 4 * 1024));
-            ptr::write_bytes(raw, 0, init_size);
+            let mut raw: *mut u8 = mem::transmute(heap::allocate(start_size, 4 * 1024));
+            ptr::write_bytes(raw, 0, start_size);
 
             MemoryJournal {
                 is_open: false,
                 is_complete: true,
-                start_size: init_size,
-                expand_size: init_size,
-                cap_bytes: init_size,
+                start_size: start_size,
+                expand_size: expand_size,
+                cap_bytes: start_size,
+                start_ptr: raw as *const u8,
                 read_ptr: raw,
                 write_ptr: raw
             }
 
         }
 
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        unsafe {
+            slice::from_raw_parts(self.start_ptr, self.cap_bytes)
+        }
     }
 
 
@@ -77,6 +89,10 @@ impl JournalInterface for MemoryJournal {
 
     fn is_open(&self) -> bool {
         self.is_open
+    }
+
+    fn reset(&mut self) {
+        self.read_ptr = self.start_ptr as *mut u8;
     }
 
     fn write(&mut self, data: &[u8]) {
@@ -159,7 +175,6 @@ impl JournalInterface for MemoryJournal {
         let mut dst: Vec<u8> = Vec::with_capacity(size);
 
         unsafe {
-
             let mut disp: Vec<u8> = Vec::with_capacity(size + 6);
             disp.set_len(size + 6);
             ptr::copy(self.read_ptr, disp.as_mut_ptr(), size + 6);
@@ -188,8 +203,8 @@ impl JournalInterface for MemoryJournal {
 
 
 #[test]
-fn it_works() {
-    let mut journal = MemoryJournal::new();
+fn commits_and_reads_one_item() {
+    let mut journal = MemoryJournal::new(1024, 1024);
 
     let data: [u8; 3] = [1, 2, 3];
     journal.open();
@@ -202,6 +217,229 @@ fn it_works() {
     assert_eq!(1, r[0]);
     assert_eq!(2, r[1]);
     assert_eq!(3, r[2]);
-
 }
+
+#[test]
+fn returns_correct_record_size() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data: [u8; 5] = [0, 1, 2, 3, 4];
+    journal.open();
+    journal.write(&data);
+    journal.commit();
+    assert_eq!(5, journal.size().unwrap());
+}
+
+#[test]
+fn is_complete_when_started() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    journal.open();
+    assert!(journal.is_complete());
+}
+
+#[test]
+fn is_not_complete_after_write() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data: [u8; 5] = [0, 1, 2, 3, 4];
+    journal.open();
+    journal.write(&data);
+    assert!(!journal.is_complete());
+}
+
+#[test]
+fn is_complete_after_commit() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data: [u8; 5] = [0, 1, 2, 3, 4];
+    journal.open();
+    journal.write(&data);
+    journal.commit();
+    assert!(journal.is_complete());
+}
+
+#[test]
+fn is_complete_after_discard() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data: [u8; 5] = [0, 1, 2, 3, 4];
+    journal.open();
+    journal.write(&data);
+    journal.discard();
+    assert!(journal.is_complete());
+}
+
+#[test]
+fn read_returns_none_when_reading_discarded_record() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data: [u8; 5] = [0, 1, 2, 3, 4];
+    journal.open();
+    journal.write(&data);
+    journal.discard();
+    assert_eq!(None, journal.read());
+}
+
+#[test]
+fn write_adds_record_in_place_of_discarded_record() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data1: [u8; 2] = [0, 1];
+    journal.open();
+    journal.write(&data1);
+    journal.commit();
+
+    let data2: [u8; 3] = [7, 8, 9];
+    journal.write(&data2);
+    journal.discard();
+
+    let data3: [u8; 4] = [6, 5, 4, 3];
+    journal.write(&data3);
+    journal.commit();
+
+    assert_eq!(2, journal.size().unwrap());
+    journal.next();
+    assert_eq!(4, journal.size().unwrap());
+}
+
+#[test]
+fn read_returns_none_when_reading_incomplete_record() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data: [u8; 5] = [0, 1, 2, 3, 4];
+    journal.open();
+    journal.write(&data);
+    assert_eq!(None, journal.read());
+}
+
+#[test]
+fn commits_multiple_items_then_reads_from_beginning() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data1: [u8; 2] = [0, 1];
+    journal.open();
+    journal.write(&data1);
+    journal.commit();
+
+    let data2: [u8; 3] = [7, 8, 9];
+    journal.write(&data2);
+    journal.commit();
+
+    let data3: [u8; 4] = [6, 5, 4, 3];
+    journal.write(&data3);
+    journal.commit();
+
+    assert_eq!(2, journal.size().unwrap());
+    journal.next();
+    assert_eq!(3, journal.size().unwrap());
+    journal.next();
+    assert_eq!(4, journal.size().unwrap());
+}
+
+#[test]
+fn read_returns_none_when_no_more_elements() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data: [u8; 5] = [0, 1, 2, 3, 4];
+    journal.open();
+    journal.write(&data);
+    journal.commit();
+    assert!(journal.read().is_some());
+    journal.next();
+    assert_eq!(None, journal.read());
+}
+
+#[test]
+fn allocates_initial_capacity_of_start_capacity() {
+    let mut journal = MemoryJournal::new(1024, 2048);
+    assert_eq!(1024, journal.cap_bytes());
+}
+
+#[test]
+fn allocates_more_capacity_by_given_size_increment() {
+    let mut journal = MemoryJournal::new(1024, 512);
+    assert_eq!(1024, journal.cap_bytes());
+    let data: [u8; 300] = unsafe { mem::uninitialized() };
+    journal.open();
+    journal.write(&data);
+    journal.commit();
+    journal.write(&data);
+    journal.commit();
+    journal.write(&data);
+    journal.commit();
+    assert_eq!(1024, journal.cap_bytes());
+    journal.write(&data);
+    journal.commit();
+    assert_eq!(1536, journal.cap_bytes());
+    journal.write(&data);
+    journal.commit();
+    assert_eq!(1536, journal.cap_bytes());
+    journal.write(&data);
+    journal.commit();
+    assert_eq!(2048, journal.cap_bytes());
+}
+
+#[test]
+fn allocates_enough_capacity_for_record_when_record_larger_than_size_increment() {
+    let mut journal = MemoryJournal::new(1024, 512);
+    assert_eq!(1024, journal.cap_bytes());
+    let data: [u8; 4000] = unsafe { mem::uninitialized() };
+    journal.open();
+    journal.write(&data);
+    journal.commit();
+    assert_eq!(4096, journal.cap_bytes());
+}
+
+#[test]
+fn reset_starts_reading_from_beginning() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data1: [u8; 2] = [0, 1];
+    journal.open();
+    journal.write(&data1);
+    journal.commit();
+
+    let data2: [u8; 3] = [7, 8, 9];
+    journal.write(&data2);
+    journal.commit();
+
+    let data3: [u8; 4] = [6, 5, 4, 3];
+    journal.write(&data3);
+    journal.commit();
+
+    journal.next();
+    journal.next();
+    journal.reset();
+
+    assert_eq!(2, journal.size().unwrap());
+    journal.next();
+    assert_eq!(3, journal.size().unwrap());
+    journal.next();
+    assert_eq!(4, journal.size().unwrap());
+}
+
+#[test]
+fn read_without_next_reads_same_record() {
+    let mut journal = MemoryJournal::new(1024, 1024);
+    let data1: [u8; 2] = [0, 1];
+    journal.open();
+    journal.write(&data1);
+    journal.commit();
+
+    let data2: [u8; 3] = [7, 8, 9];
+    journal.write(&data2);
+    journal.commit();
+
+    assert_eq!(2, journal.size().unwrap());
+    assert_eq!(2, journal.size().unwrap());
+    journal.next();
+    assert_eq!(3, journal.size().unwrap());
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
