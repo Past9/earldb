@@ -20,6 +20,7 @@ pub struct JournalWriter {
 }
 impl JournalWriter {
 
+    /// Creates a new JournalWriter object
     pub fn new(
         storage_origin: *const u8,
         capacity: usize,
@@ -85,23 +86,37 @@ impl JournalWriter {
         needed_capacity >= self.capacity
     }
 
+    /// Returns the current size of the journal in bytes. This is the current capacity,
+    /// not the size of the actual records, which is likely smaller.
     pub fn capacity(&self) -> usize {
         self.capacity
     }
 
+    /// Returns whether an uncommitted record has been written to the journal
     pub fn is_writing(&self) -> bool {
         self.is_writing
     }
 
-    pub fn write(&mut self, data: &[u8]) {
-        if self.is_writing { return }
+    /// Appends a new record to the journal but does not mark it as committed.
+    /// Returns true if the write was performed.
+    /// Returns false and does nothing if there is currently another uncommitted record.
+    /// Returns false if enough memory could not be allocated for the new record.
+    pub fn write(&mut self, data: &[u8]) -> bool {
+        if self.is_writing { return false }
 
         // Lock the writer so that no other writes can take place until a commit
         // or discard
         self.is_writing = true;
 
         // Allocate more memory to make room for the new record if necessary
-        self.expand_if_needed(data.len());
+        let enough_capacity = self.expand_if_needed(data.len());
+
+        // If enough capacity could not be allocated for the new record,
+        // cancel the write and return false
+        if !enough_capacity {
+            self.is_writing = false;
+            return false;
+        }
 
         // Write the STX (start of text) marker and advance the write offset, 
         // then record how much data is uncommitted
@@ -127,8 +142,13 @@ impl JournalWriter {
         self.write_offset += data.len();
         self.uncommitted_size += data.len();
 
+        // Return that the write was successful (though still uncommitted)
+        true
+
     }
 
+    /// Marks a previously written and uncommitted record as committed.
+    /// Does nothing if there is not currently an uncommitted record.
     pub fn commit(&mut self) {
         if !self.is_writing { return }
 
@@ -144,6 +164,8 @@ impl JournalWriter {
         self.is_writing = false;
     }
 
+    /// Discards a previously written but uncommitted record.
+    /// Does nothing if there is not currently an uncommitted record.
     pub fn discard(&mut self) {
         if !self.is_writing { return }
 
