@@ -3,4 +3,7 @@ name = "earldb"
 version = "0.1.0"
 authors = ["Past9 <past9sys@gmail.com>"]
 
+[profile.test]
+debug = true
+
 [dependencies]

@@ -13,17 +13,17 @@ pub trait Journal {
     fn close(&mut self);
     fn is_open(&self) -> bool;
 
-    fn reset(&mut self);
+    fn reset(&mut self) -> bool;
 
-    fn write(&mut self, data: &[u8]);
-    fn commit(&mut self);
-    fn discard(&mut self);
+    fn write(&mut self, data: &[u8]) -> bool;
+    fn commit(&mut self) -> bool;
+    fn discard(&mut self) -> bool;
 
-    fn next(&mut self);
-    fn size(&self) -> Option<u32>;
+    fn next(&mut self) -> bool;
+    fn size(&self) -> u32;
     fn read(&self) -> Option<Vec<u8>>;
-    fn is_complete(&self) -> bool;
+    fn is_writing(&self) -> bool;
 
-    fn cap_bytes(&self) -> usize;
+    fn capacity(&self) -> usize;
 
 }

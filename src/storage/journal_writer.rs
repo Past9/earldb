@@ -9,7 +9,7 @@ use storage::journal::Journal;
 
 
 pub struct JournalWriter {
-    storage_origin: *const u8,
+    storage_origin: Option<*const u8>,
     record_offset: usize,
     write_offset: usize,
     capacity: usize,
@@ -22,13 +22,15 @@ impl JournalWriter {
 
     /// Creates a new JournalWriter object
     pub fn new(
-        storage_origin: *const u8,
         initial_capacity: usize,
         expand_size: usize,
         align: usize,
     ) -> JournalWriter {
+
+        let storage_origin = unsafe { heap::allocate(initial_capacity, align) as *const u8 };
+
         JournalWriter {
-            storage_origin: storage_origin,
+            storage_origin: Some(storage_origin),
             capacity: initial_capacity,
             expand_size: expand_size,
             align: align,
@@ -41,14 +43,14 @@ impl JournalWriter {
 
     fn record_ptr(&self) -> *mut u8 {
         return (
-            self.storage_origin as usize + 
+            self.storage_origin() as usize + 
             self.record_offset 
         ) as *mut u8;
     }
 
     fn write_ptr(&self) -> *mut u8 {
         return (
-            self.storage_origin as usize + 
+            self.storage_origin() as usize + 
             self.record_offset + 
             self.write_offset
         ) as *mut u8;
@@ -73,17 +75,37 @@ impl JournalWriter {
         let new_capacity = (needed_capacity as f32 / self.expand_size as f32).ceil() as usize;
 
         // Allocate and record the new capacity
-        unsafe {
-            self.capacity = heap::reallocate_inplace(
-                self.storage_origin as *mut u8, 
+        let ptr = unsafe {
+            heap::reallocate(
+                self.storage_origin() as *mut u8, 
                 self.capacity, 
                 new_capacity, 
                 self.align
-            );
-        }
+            )
+        };
 
         // Return whether or not enough space could be allocated 
-        needed_capacity >= self.capacity
+        // and move the storage origin if needed
+        if ptr.is_null() {
+            return false;
+        } else {
+            self.storage_origin = Some(ptr as *const u8);
+            self.capacity = new_capacity;
+            return true;
+        }
+
+    }
+
+    pub fn forget(&mut self) {
+        self.storage_origin = None;
+    }
+
+    pub fn align(&self) -> usize {
+        self.align
+    }
+
+    pub fn storage_origin(&self) -> *const u8 {
+        self.storage_origin.unwrap()
     }
 
     /// Returns the current size of the journal in bytes. This is the current capacity,
@@ -149,8 +171,8 @@ impl JournalWriter {
 
     /// Marks a previously written and uncommitted record as committed.
     /// Does nothing if there is not currently an uncommitted record.
-    pub fn commit(&mut self) {
-        if !self.is_writing { return }
+    pub fn commit(&mut self) -> bool {
+        if !self.is_writing { return false }
 
         // Write the ETX (end of text) marker
         unsafe { ptr::write(self.write_ptr(), 0x03) }
@@ -162,12 +184,14 @@ impl JournalWriter {
         self.write_offset = 0;
         self.uncommitted_size = 0;
         self.is_writing = false;
+
+        true
     }
 
     /// Discards a previously written but uncommitted record.
     /// Does nothing if there is not currently an uncommitted record.
-    pub fn discard(&mut self) {
-        if !self.is_writing { return }
+    pub fn discard(&mut self) -> bool {
+        if !self.is_writing { return false }
 
         // Reinitialize all the uncommitted bytes to zero
         unsafe { ptr::write_bytes(self.record_ptr(), 0, self.uncommitted_size) }
@@ -176,6 +200,8 @@ impl JournalWriter {
         self.write_offset = 0;
         self.uncommitted_size = 0;
         self.is_writing = false;
+
+        true
     }
 
 }

@@ -6,70 +6,28 @@ extern crate core;
 use alloc::heap;
 use std::{mem, ptr, slice};
 use storage::journal::Journal;
+use storage::journal_reader::JournalReader;
+use storage::journal_writer::JournalWriter;
 
 
 pub struct MemoryJournal {
-    is_open: bool,
-    is_complete: bool,
-    start_size: usize,
-    expand_size: usize,
-    cap_bytes: usize,
-    size_bytes: usize,
-    start_ptr: *const u8,
-    read_ptr: *mut u8,
-    write_ptr: *mut u8
-
+    reader: JournalReader,
+    writer: JournalWriter,
+    is_open: bool
 }
 impl MemoryJournal {
+
     pub fn new(
-        start_size: usize,
+        initial_capacity: usize,
         expand_size: usize
     ) -> MemoryJournal {
+        let writer = JournalWriter::new(initial_capacity, expand_size, 1024);
+        let reader = JournalReader::new(writer.storage_origin(), writer.capacity());
 
-
-        unsafe {
-            let mut raw: *mut u8 = mem::transmute(heap::allocate(start_size, 1024));
-            ptr::write_bytes(raw, 0, start_size);
-
-            MemoryJournal {
-                is_open: false,
-                is_complete: true,
-                start_size: start_size,
-                expand_size: expand_size,
-                cap_bytes: start_size,
-                size_bytes: 0,
-                start_ptr: raw as *const u8,
-                read_ptr: raw,
-                write_ptr: raw
-            }
-
-        }
-
-    }
-
-    fn as_slice(&self) -> &[u8] {
-        unsafe {
-            slice::from_raw_parts(self.start_ptr, self.cap_bytes)
-        }
-    }
-
-
-    fn expand(&mut self, needed: usize) {
-        let req_size = needed + self.size_bytes + 6; 
-        println!("REQ: {}", req_size);
-        if (req_size <= self.cap_bytes) { return; }
-
-        let additional = req_size - self.cap_bytes;
-
-        let expansion_size = (additional as f64 / self.expand_size as f64).ceil() as usize * self.expand_size;
-
-        println!("{}, {}, {}", needed, additional, expansion_size);
-        
-        let new_size = self.cap_bytes + expansion_size;
-        unsafe {
-            let ptr = self.start_ptr as *mut u8;
-            heap::reallocate(ptr, self.cap_bytes, new_size, 1024);
-            self.cap_bytes = new_size;
+        MemoryJournal {
+            reader: reader,
+            writer: writer,
+            is_open: false
         }
     }
 
@@ -89,102 +47,71 @@ impl Journal for MemoryJournal {
         self.is_open
     }
 
-    fn reset(&mut self) {
-        self.read_ptr = self.start_ptr as *mut u8;
+    fn reset(&mut self) -> bool {
+        if !self.is_open { return false }
+        self.reader.reset();
+        true
     }
 
-    fn write(&mut self, data: &[u8]) {
-        if !self.is_open { return }
-        if !self.is_complete { return }
-
-        self.is_complete = false;
-
-        self.expand(data.len());
-
-        unsafe {
-            ptr::write(self.write_ptr, 0x02);
-            self.write_ptr = self.write_ptr.offset(1);
-            let len = data.len() as u32;
-            let len_src: *const u32 = mem::transmute(&len);
-            ptr::copy(len_src, self.write_ptr as *mut u32, 1);
-            self.write_ptr = self.write_ptr.offset(4);
-            let dest_slice = slice::from_raw_parts_mut(self.write_ptr, len as usize);
-            dest_slice.clone_from_slice(data);
-            self.write_ptr = self.write_ptr.offset(len as isize);
+    fn write(&mut self, data: &[u8]) -> bool {
+        if !self.is_open { return false }
+        let old_storage_origin = self.writer.storage_origin();
+        let res = self.writer.write(data);
+        if self.writer.storage_origin() != old_storage_origin {
+            self.reader.storage_reallocated(self.writer.storage_origin(), self.writer.capacity());
         }
-
+        res
     }
 
-    fn commit(&mut self) {
-        if !self.is_open { return }
-        if self.is_complete { return }
-
-        unsafe {
-            ptr::write(self.write_ptr, 0x03);
-            self.write_ptr = self.write_ptr.offset(1);
-        }
-
-        self.is_complete = true;
+    fn commit(&mut self) -> bool {
+        if !self.is_open { return false }
+        self.writer.commit()
     }
 
-    fn discard(&mut self) {
-        if !self.is_open { return }
-
-        unsafe {
-            self.write_ptr = self.read_ptr;
-            let len = self.cap_bytes - (self.write_ptr as usize - self.start_ptr as usize);
-            ptr::write_bytes(self.write_ptr, 0, len);
-        }
-
-        self.is_complete = true;
+    fn discard(&mut self) -> bool {
+        if !self.is_open { return false }
+        self.writer.discard()
     }
 
-    fn next(&mut self) {
-        if !self.is_open { return }
-        if !self.is_complete { return }
-
-        unsafe {
-            self.read_ptr = self.read_ptr.offset(6 + self.size().unwrap() as isize);
-        }
+    fn next(&mut self) -> bool {
+        if !self.is_open { return false }
+        self.reader.next()
     }
 
-    fn size(&self) -> Option<u32> {
-        if !self.is_open { return None }
-        if !self.is_complete { return None }
-
-        unsafe {
-            let size_ptr = self.read_ptr.offset(1) as *const u32;
-            Some(*size_ptr)
-        }
+    fn size(&self) -> u32 {
+        if !self.is_open { return 0 }
+        self.reader.size()
     }
-
-
 
     fn read(&self) -> Option<Vec<u8>> {
         if !self.is_open { return None }
-        if !self.is_complete { return None }
+        self.reader.read()
+    }
 
-        let size = self.size().unwrap() as usize;
-        let mut dst: Vec<u8> = Vec::with_capacity(size);
+    fn is_writing(&self) -> bool {
+        if !self.is_open { return false }
+        self.writer.is_writing()
+    }
 
-        unsafe {
-            let mut disp: Vec<u8> = Vec::with_capacity(size + 6);
-            disp.set_len(size + 6);
-            ptr::copy(self.read_ptr, disp.as_mut_ptr(), size + 6);
+    fn capacity(&self) -> usize {
+        if !self.is_open { return 0 }
+        self.writer.capacity()
+    }
 
-            dst.set_len(size);
-            ptr::copy(self.read_ptr.offset(5), dst.as_mut_ptr(), size);
+}
+impl Drop for MemoryJournal {
 
-            return Some(dst);
+    fn drop(&mut self) {
+        let storage_origin = self.writer.storage_origin();
+        unsafe { 
+            heap::deallocate(
+                storage_origin as *mut u8, 
+                self.writer.capacity(), 
+                self.writer.align()
+            ); 
         }
-    }
-
-    fn is_complete(&self) -> bool {
-        self.is_complete
-    }
-
-    fn cap_bytes(&self) -> usize {
-        self.cap_bytes
+        self.reader.forget();
+        self.writer.forget();
     }
 
 }
@@ -227,14 +154,14 @@ mod tests {
         journal.open();
         journal.write(&data);
         journal.commit();
-        assert_eq!(5, journal.size().unwrap());
+        assert_eq!(5, journal.size());
     }
 
     #[test]
     fn is_complete_when_started() {
         let mut journal = MemoryJournal::new(1024, 1024);
         journal.open();
-        assert!(journal.is_complete());
+        assert!(!journal.is_writing());
     }
 
     #[test]
@@ -243,7 +170,7 @@ mod tests {
         let data: [u8; 5] = [0, 1, 2, 3, 4];
         journal.open();
         journal.write(&data);
-        assert!(!journal.is_complete());
+        assert!(journal.is_writing());
     }
 
     #[test]
@@ -253,7 +180,7 @@ mod tests {
         journal.open();
         journal.write(&data);
         journal.commit();
-        assert!(journal.is_complete());
+        assert!(!journal.is_writing());
     }
 
     #[test]
@@ -263,7 +190,7 @@ mod tests {
         journal.open();
         journal.write(&data);
         journal.discard();
-        assert!(journal.is_complete());
+        assert!(!journal.is_writing());
     }
 
     #[test]
@@ -292,9 +219,9 @@ mod tests {
         journal.write(&data3);
         journal.commit();
 
-        assert_eq!(2, journal.size().unwrap());
+        assert_eq!(2, journal.size());
         journal.next();
-        assert_eq!(4, journal.size().unwrap());
+        assert_eq!(4, journal.size());
     }
 
     #[test]
@@ -322,11 +249,11 @@ mod tests {
         journal.write(&data3);
         journal.commit();
 
-        assert_eq!(2, journal.size().unwrap());
+        assert_eq!(2, journal.size());
         journal.next();
-        assert_eq!(3, journal.size().unwrap());
+        assert_eq!(3, journal.size());
         journal.next();
-        assert_eq!(4, journal.size().unwrap());
+        assert_eq!(4, journal.size());
     }
 
     #[test]
@@ -344,13 +271,13 @@ mod tests {
     #[test]
     fn allocates_initial_capacity_of_start_capacity() {
         let mut journal = MemoryJournal::new(1024, 2048);
-        assert_eq!(1024, journal.cap_bytes());
+        assert_eq!(1024, journal.capacity());
     }
 
     #[test]
     fn allocates_more_capacity_by_given_size_increment() {
         let mut journal = MemoryJournal::new(4096, 2048);
-        assert_eq!(4096, journal.cap_bytes());
+        assert_eq!(4096, journal.capacity());
         let data: [u8; 1500] = unsafe { mem::uninitialized() };
         journal.open();
         journal.write(&data);
@@ -359,27 +286,27 @@ mod tests {
         journal.commit();
         journal.write(&data);
         journal.commit();
-        assert_eq!(6144, journal.cap_bytes());
+        assert_eq!(6144, journal.capacity());
         journal.write(&data);
         journal.commit();
-        assert_eq!(6144, journal.cap_bytes());
+        assert_eq!(6144, journal.capacity());
         journal.write(&data);
         journal.commit();
-        assert_eq!(8192, journal.cap_bytes());
+        assert_eq!(8192, journal.capacity());
         journal.write(&data);
         journal.commit();
-        assert_eq!(8192, journal.cap_bytes());
+        assert_eq!(8192, journal.capacity());
     }
 
     #[test]
     fn allocates_enough_capacity_for_record_when_record_larger_than_size_increment() {
         let mut journal = MemoryJournal::new(1024, 512);
-        assert_eq!(1024, journal.cap_bytes());
+        assert_eq!(1024, journal.capacity());
         let data: [u8; 4000] = unsafe { mem::uninitialized() };
         journal.open();
         journal.write(&data);
         journal.commit();
-        assert_eq!(4096, journal.cap_bytes());
+        assert_eq!(4096, journal.capacity());
     }
 
     #[test]
@@ -402,11 +329,11 @@ mod tests {
         journal.next();
         journal.reset();
 
-        assert_eq!(2, journal.size().unwrap());
+        assert_eq!(2, journal.size());
         journal.next();
-        assert_eq!(3, journal.size().unwrap());
+        assert_eq!(3, journal.size());
         journal.next();
-        assert_eq!(4, journal.size().unwrap());
+        assert_eq!(4, journal.size());
     }
 
     #[test]
@@ -421,10 +348,10 @@ mod tests {
         journal.write(&data2);
         journal.commit();
 
-        assert_eq!(2, journal.size().unwrap());
-        assert_eq!(2, journal.size().unwrap());
+        assert_eq!(2, journal.size());
+        assert_eq!(2, journal.size());
         journal.next();
-        assert_eq!(3, journal.size().unwrap());
+        assert_eq!(3, journal.size());
     }
 
 }
