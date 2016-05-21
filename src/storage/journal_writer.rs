@@ -72,7 +72,9 @@ impl JournalWriter {
         if self.capacity >= needed_capacity { return true }
 
         // Determine the new size of the journal in multiples of expand_size
-        let new_capacity = (needed_capacity as f32 / self.expand_size as f32).ceil() as usize;
+        let new_capacity = 
+            (needed_capacity as f32 / self.expand_size as f32).ceil() as usize 
+            * self.expand_size;
 
         // Allocate and record the new capacity
         let ptr = unsafe {
@@ -136,7 +138,7 @@ impl JournalWriter {
         // If enough capacity could not be allocated for the new record,
         // cancel the write and return false
         if !enough_capacity {
-            self.is_writing = false;
+            self.discard();
             return false;
         }
 
@@ -178,7 +180,7 @@ impl JournalWriter {
         unsafe { ptr::write(self.write_ptr(), 0x03) }
 
         // Move the record offset to the next record
-        self.record_offset = self.uncommitted_size + 1;
+        self.record_offset += self.uncommitted_size + 1;
 
         // Reset state
         self.write_offset = 0;

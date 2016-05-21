@@ -271,15 +271,16 @@ mod tests {
     #[test]
     fn allocates_initial_capacity_of_start_capacity() {
         let mut journal = MemoryJournal::new(1024, 2048);
+        journal.open();
         assert_eq!(1024, journal.capacity());
     }
 
     #[test]
     fn allocates_more_capacity_by_given_size_increment() {
         let mut journal = MemoryJournal::new(4096, 2048);
+        journal.open();
         assert_eq!(4096, journal.capacity());
         let data: [u8; 1500] = unsafe { mem::uninitialized() };
-        journal.open();
         journal.write(&data);
         journal.commit();
         journal.write(&data);
@@ -295,15 +296,15 @@ mod tests {
         assert_eq!(8192, journal.capacity());
         journal.write(&data);
         journal.commit();
-        assert_eq!(8192, journal.capacity());
+        assert_eq!(10240, journal.capacity());
     }
 
     #[test]
     fn allocates_enough_capacity_for_record_when_record_larger_than_size_increment() {
         let mut journal = MemoryJournal::new(1024, 512);
+        journal.open();
         assert_eq!(1024, journal.capacity());
         let data: [u8; 4000] = unsafe { mem::uninitialized() };
-        journal.open();
         journal.write(&data);
         journal.commit();
         assert_eq!(4096, journal.capacity());

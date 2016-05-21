@@ -37,6 +37,7 @@ impl JournalReader {
     fn ptr_at_offset(&self, offset: usize) -> *const u8 {
         return (
             self.storage_origin() as usize + 
+            self.record_offset +
             offset
         ) as *const u8;
     }
@@ -87,9 +88,8 @@ impl JournalReader {
             return true;
         }
 
-        // Otherwise, go back to the old offset and return false
-        // to indicate that there is no valid record to be read
-        self.record_offset = old_offset;
+        // Otherwise return false to indicate that the data at the
+        // current position is not a valid and complete record
         false
     }
 
@@ -103,7 +103,11 @@ impl JournalReader {
     }
 
     pub fn read(&self) -> Option<Vec<u8>> {
-        Some(self.data_slice().to_vec())
+        if self.has_start() && self.has_end() {
+            Some(self.data_slice().to_vec())
+        } else {
+            None
+        }
     }
 
 }
