@@ -23,13 +23,13 @@ impl JournalWriter {
     /// Creates a new JournalWriter object
     pub fn new(
         storage_origin: *const u8,
-        capacity: usize,
+        initial_capacity: usize,
         expand_size: usize,
         align: usize,
     ) -> JournalWriter {
         JournalWriter {
             storage_origin: storage_origin,
-            capacity: capacity,
+            capacity: initial_capacity,
             expand_size: expand_size,
             align: align,
             record_offset: 0,
