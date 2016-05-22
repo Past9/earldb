@@ -602,19 +602,25 @@ mod tests {
     fn expand_returns_false_when_alloc_fails() {
         let mut writer = JournalWriter::new(128, 64, 1024, 4096).unwrap();
         // Subtract 1000 from usize::MAX to avoid arithmetic overflow
+        // when calculating required size for new record
         assert!(!writer.expand_if_needed(usize::max_value() - 1000));
     }
 
-    /*
     #[test]
-    fn heap_alloc_fail() {
-        //let ptr = unsafe { heap::allocate(usize::max_value(), 1024) as *const u8 };
-        let ptr = unsafe { heap::allocate(1024, 1023) as *const u8 };
-        assert!(ptr.is_null());
+    fn failed_expansion_does_not_alter_record_data() {
+        let mut writer = JournalWriter::new(128, 64, 1024, 4096).unwrap();
+        writer.write(&[0x01, 0x02, 0x03]);
+        writer.commit();
+        assert_eq!(
+            [0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03],
+            writer.as_slice()[0..9]
+        );
+        assert!(!writer.expand_if_needed(usize::max_value()));
+        assert_eq!(
+            [0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03],
+            writer.as_slice()[0..9]
+        );
     }
-    */
 
-
-    
 
 }
