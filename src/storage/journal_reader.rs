@@ -11,18 +11,21 @@ use storage::journal::Journal;
 pub struct JournalReader {
     storage_origin: Option<*const u8>,
     record_offset: usize,
-    capacity: usize
+    capacity: usize,
+    align: usize
 }
 impl JournalReader {
     
     pub fn new(
         storage_origin: *const u8,
-        initial_capacity: usize
+        initial_capacity: usize,
+        align: usize
     ) -> JournalReader {
         JournalReader {
             storage_origin: Some(storage_origin),
             record_offset: 0,
             capacity: initial_capacity,
+            align: align
         }
     }
 
@@ -107,6 +110,22 @@ impl JournalReader {
             Some(self.data_slice().to_vec())
         } else {
             None
+        }
+    }
+
+}
+impl Drop for JournalReader {
+
+    fn drop(&mut self) {
+        match self.storage_origin {
+            Some(s) => unsafe {
+                heap::deallocate(
+                    s as *mut u8,
+                    self.capacity,
+                    self.align
+                );
+            },
+            None => ()
         }
     }
 

@@ -29,7 +29,7 @@ impl JournalWriter {
 
         let storage_origin = unsafe { heap::allocate(initial_capacity, align) as *const u8 };
 
-        JournalWriter {
+        let writer = JournalWriter {
             storage_origin: Some(storage_origin),
             capacity: initial_capacity,
             expand_size: expand_size,
@@ -38,7 +38,17 @@ impl JournalWriter {
             write_offset: 0,
             is_writing: false,
             uncommitted_size: 0
-        }
+        };
+
+        writer.init_mem_from(0);
+
+        writer
+    }
+
+    fn init_mem_from(&self, start: usize) {
+        let ptr = (self.storage_origin() as usize + start) as *mut u8;
+        let len = self.capacity - start;
+        unsafe { ptr::write_bytes(ptr, 0, len) }
     }
 
     fn record_ptr(&self) -> *mut u8 {
@@ -86,20 +96,36 @@ impl JournalWriter {
             )
         };
 
-        // Return whether or not enough space could be allocated 
-        // and move the storage origin if needed
+        // Return false if not enough storage could be allocated
         if ptr.is_null() {
             return false;
         } else {
+            // Set the new capacity and pointer, remembering the old capacity
+            let old_capacity = self.capacity;
             self.storage_origin = Some(ptr as *const u8);
             self.capacity = new_capacity;
+            // Initialize the new storage (set all bytes to 0x00)
+            self.init_mem_from(old_capacity);
+            // Return true to indicate that allocation was successful
             return true;
         }
 
     }
 
+    pub fn as_slice(&self) -> &[u8] {
+        match self.storage_origin {
+            Some(x) => unsafe { slice::from_raw_parts(x, self.capacity) },
+            None => &[]
+        }
+    }
+
     pub fn forget(&mut self) {
         self.storage_origin = None;
+        self.capacity = 0;
+    }
+
+    pub fn expand_size(&self) -> usize {
+        self.expand_size
     }
 
     pub fn align(&self) -> usize {
@@ -205,5 +231,236 @@ impl JournalWriter {
 
         true
     }
+
+}
+impl Drop for JournalWriter {
+
+    fn drop(&mut self) {
+        match self.storage_origin {
+            Some(s) => unsafe {
+                heap::deallocate(
+                    s as *mut u8,
+                    self.capacity(),
+                    self.align()
+                );
+            },
+            None => ()
+        }
+    }
+
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    #![feature(alloc, heap_api)]
+
+    extern crate alloc;
+    extern crate core;
+
+    use alloc::heap;
+    use std::{mem, ptr, slice};
+    use storage::journal_writer::JournalWriter;
+
+    #[test]
+    fn new_sets_properties() {
+        let writer = JournalWriter::new(256, 512, 1024);
+        assert_eq!(256, writer.capacity());
+        assert_eq!(512, writer.expand_size());
+        assert_eq!(1024, writer.align());
+    }
+
+    #[test]
+    fn as_slice_returns_slice_with_capacity_length() {
+        let writer = JournalWriter::new(256, 512, 1024);
+        let slice = writer.as_slice();
+        assert_eq!(slice.len(), writer.capacity());
+    }
+
+    #[test]
+    fn new_inits_memory_to_zeroes() {
+        let writer = JournalWriter::new(256, 512, 1024);
+        let slice = writer.as_slice();
+        for i in slice {
+            assert_eq!(0x00, *i);
+        }
+    }
+
+    #[test]
+    fn as_slice_returns_empty_slice_after_forget() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.forget();
+        let slice = writer.as_slice();
+        assert_eq!(0, slice.len());
+    }
+
+    #[test]
+    fn capacity_is_zero_after_forget() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.forget();
+        assert_eq!(0, writer.capacity());
+    }
+
+    #[test]
+    fn storage_origin_returns_non_null_pointer() {
+        let writer = JournalWriter::new(256, 512, 1024);
+        assert!(!writer.storage_origin().is_null());
+    }
+
+    #[test]
+    #[should_panic]
+    fn storage_origin_panics_after_forget() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.forget();
+        writer.storage_origin();
+    }
+
+    #[test]
+    fn is_not_writing_when_new() {
+        let writer = JournalWriter::new(256, 512, 1024);
+        assert!(!writer.is_writing());
+    }
+
+    #[test]
+    fn commit_returns_false_when_not_writing() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        assert!(!writer.commit());
+    }
+
+    #[test]
+    fn commit_does_not_alter_contents_or_capacity_when_not_writing() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.commit();
+        assert_eq!(256, writer.capacity());
+        let slice = writer.as_slice();
+        for i in slice {
+            assert_eq!(0x00, *i);
+        }
+    }
+
+    #[test]
+    fn write_sets_is_writing_to_true() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        assert!(writer.is_writing());
+    }
+
+    #[test]
+    fn write_returns_true_when_not_already_writing() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        assert!(writer.write(&[1, 2, 3]));
+    }
+
+    #[test]
+    fn write_returns_false_when_already_writing() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        assert!(!writer.write(&[4, 5, 6]));
+    }
+
+    #[test]
+    fn write_sets_data_except_end_byte() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        assert_eq!(
+            [0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x00],
+            writer.as_slice()[0..9]
+        );
+    }
+
+    #[test]
+    fn discard_returns_false_when_not_writing() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        assert!(!writer.discard());
+    }
+
+    #[test]
+    fn discard_returns_true_when_writing() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        assert!(writer.discard());
+    }
+
+    #[test]
+    fn discard_zeroes_bytes() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        writer.discard();
+        assert_eq!(
+            [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+            writer.as_slice()[0..9]
+        );
+    }
+
+    #[test]
+    fn commit_sets_end_byte() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        writer.commit();
+        assert_eq!(
+            [0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03],
+            writer.as_slice()[0..9]
+        );
+    }
+
+    #[test]
+    fn discard_zeroes_only_uncommitted_bytes() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        writer.commit();
+        writer.write(&[4, 5, 6]);
+        assert_eq!(
+            [
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03, 
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x00
+            ],
+            writer.as_slice()[0..18]
+        );
+        writer.discard();
+        assert_eq!(
+            [
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03, 
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ],
+            writer.as_slice()[0..18]
+        );
+    }
+
+    #[test]
+    fn write_sets_contents_in_place_of_discarded_record() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        writer.commit();
+        writer.write(&[4, 5, 6]);
+        writer.discard();
+        writer.write(&[7, 8, 9]);
+        assert_eq!(
+            [
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03, 
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x07, 0x08, 0x09, 0x00
+            ],
+            writer.as_slice()[0..18]
+        );
+    }
+
+    #[test]
+    fn commit_sets_end_bytes_on_multiple_records() {
+        let mut writer = JournalWriter::new(256, 512, 1024);
+        writer.write(&[1, 2, 3]);
+        writer.commit();
+        writer.write(&[4, 5, 6]);
+        writer.commit();
+        assert_eq!(
+            [
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03, 
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ],
+            writer.as_slice()[0..18]
+        );
+    }
+
+
+    
 
 }

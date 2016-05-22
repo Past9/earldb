@@ -22,7 +22,7 @@ impl MemoryJournal {
         expand_size: usize
     ) -> MemoryJournal {
         let writer = JournalWriter::new(initial_capacity, expand_size, 1024);
-        let reader = JournalReader::new(writer.storage_origin(), writer.capacity());
+        let reader = JournalReader::new(writer.storage_origin(), writer.capacity(), 1024);
 
         MemoryJournal {
             reader: reader,
@@ -117,6 +117,7 @@ impl Drop for MemoryJournal {
 }
 
 
+/*
 #[cfg(test)]
 mod tests {
 
@@ -356,3 +357,4 @@ mod tests {
     }
 
 }
+*/
