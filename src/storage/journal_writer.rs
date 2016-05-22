@@ -6,6 +6,7 @@ extern crate core;
 use alloc::heap;
 use std::{mem, ptr, slice};
 use storage::journal::Journal;
+//use std::num::CheckedAdd;
 
 pub struct JournalWriter {
     storage_origin: Option<*const u8>,
@@ -107,19 +108,27 @@ impl JournalWriter {
         // u32 data length (4 bytes) +
         // Record data (data_size bytes) +
         // ETX byte(1 byte)
-        let record_size = 1 + 4 + data_size + 1;
+        let record_size = match 6usize.checked_add(data_size) {
+            Some(x) => x,
+            None => return false
+        };
 
         // Determine the minimum size that the journal needs to be in
         // order to hold the new record
-        let needed_capacity = self.record_offset + record_size;
+        let needed_capacity = match self.record_offset.checked_add(record_size) {
+            Some(x) => x,
+            None => return false
+        };
 
         // Return if there is already enough room 
         if self.capacity >= needed_capacity { return true }
 
         // Determine the new size of the journal in multiples of expand_size
-        let new_capacity = 
-            (needed_capacity as f32 / self.expand_size as f32).ceil() as usize 
-            * self.expand_size;
+        let expand_increments = (needed_capacity as f32 / self.expand_size as f32).ceil() as usize;
+        let new_capacity = match expand_increments.checked_mul(self.expand_size) {
+            Some(x) => x,
+            None => return false
+        };
 
         // Allocate and record the new capacity
         let ptr = unsafe {
@@ -535,6 +544,65 @@ mod tests {
             ],
             writer.as_slice()[0..18]
         );
+    }
+
+    #[test]
+    fn expands_when_enough_room_exists() {
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
+
+        let mut data = Vec::<u8>::with_capacity(200);
+        for i in 0..200 {
+            data.push(i);
+        }
+
+        writer.write(data.as_slice());
+        assert_eq!(200, data.as_slice().len());
+        assert_eq!(256, writer.capacity());
+        writer.commit();
+        writer.write(data.as_slice());
+        assert_eq!(512, writer.capacity());
+        writer.commit();
+        writer.write(data.as_slice());
+        assert_eq!(1024, writer.capacity());
+        writer.commit();
+        writer.write(data.as_slice());
+        assert_eq!(1024, writer.capacity());
+    }
+
+    #[test]
+    fn expands_when_record_larger_than_expand_size() {
+        let mut writer = JournalWriter::new(128, 64, 1024, 4096).unwrap();
+
+        let mut data = Vec::<u8>::with_capacity(200);
+        for i in 0..200 {
+            data.push(i);
+        }
+
+        writer.write(data.as_slice());
+        assert_eq!(200, data.as_slice().len());
+        assert_eq!(256, writer.capacity());
+        writer.commit();
+        writer.write(data.as_slice());
+        assert_eq!(448, writer.capacity());
+        writer.commit();
+        writer.write(data.as_slice());
+        assert_eq!(640, writer.capacity());
+        writer.commit();
+        writer.write(data.as_slice());
+        assert_eq!(832, writer.capacity());
+    }
+
+    #[test]
+    fn expand_returns_false_when_arithmetic_overflow() {
+        let mut writer = JournalWriter::new(128, 64, 1024, 4096).unwrap();
+        assert!(!writer.expand_if_needed(usize::max_value()));
+    }
+
+    #[test]
+    fn expand_returns_false_when_alloc_fails() {
+        let mut writer = JournalWriter::new(128, 64, 1024, 4096).unwrap();
+        // Subtract 1000 from usize::MAX to avoid arithmetic overflow
+        assert!(!writer.expand_if_needed(usize::max_value() - 1000));
     }
 
     /*
