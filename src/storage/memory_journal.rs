@@ -21,7 +21,7 @@ impl MemoryJournal {
         initial_capacity: usize,
         expand_size: usize
     ) -> MemoryJournal {
-        let writer = JournalWriter::new(initial_capacity, expand_size, 1024);
+        let writer = JournalWriter::new(initial_capacity, expand_size, 1024, 4096).unwrap();
         let reader = JournalReader::new(writer.storage_origin(), writer.capacity(), 1024);
 
         MemoryJournal {

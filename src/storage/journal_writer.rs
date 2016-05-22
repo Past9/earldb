@@ -7,7 +7,6 @@ use alloc::heap;
 use std::{mem, ptr, slice};
 use storage::journal::Journal;
 
-
 pub struct JournalWriter {
     storage_origin: Option<*const u8>,
     record_offset: usize,
@@ -15,6 +14,7 @@ pub struct JournalWriter {
     capacity: usize,
     expand_size: usize,
     align: usize,
+    max_supported_page_size: usize,
     is_writing: bool,
     uncommitted_size: usize
 }
@@ -25,7 +25,15 @@ impl JournalWriter {
         initial_capacity: usize,
         expand_size: usize,
         align: usize,
-    ) -> JournalWriter {
+        max_supported_page_size: usize
+    ) -> Option<JournalWriter> {
+
+        if !JournalWriter::check_mem_params(
+            max_supported_page_size,
+            align,
+            expand_size,
+            initial_capacity
+        ) { return None };
 
         let storage_origin = unsafe { heap::allocate(initial_capacity, align) as *const u8 };
 
@@ -34,6 +42,7 @@ impl JournalWriter {
             capacity: initial_capacity,
             expand_size: expand_size,
             align: align,
+            max_supported_page_size: max_supported_page_size,
             record_offset: 0,
             write_offset: 0,
             is_writing: false,
@@ -42,7 +51,33 @@ impl JournalWriter {
 
         writer.init_mem_from(0);
 
-        writer
+        Some(writer)
+    }
+
+    fn is_power_of_two(n: usize) -> bool {
+        return (n != 0) && (n & (n - 1)) == 0;
+    }
+
+    fn check_mem_params(
+        max_page_size: usize,
+        align: usize,
+        expand_size: usize,
+        initial_capacity: usize
+    ) -> bool {
+        // Initial capacity and expansion size must be greater than zero
+        if initial_capacity < 1 || expand_size < 1 { return false }
+        // Max page size must be a power of 2 
+        if !JournalWriter::is_power_of_two(max_page_size) { return false }
+        // Alignment must be a power of 2
+        if !JournalWriter::is_power_of_two(align) { return false }
+        // Initial capacity must be a power of 2
+        if !JournalWriter::is_power_of_two(initial_capacity) { return false }
+        // Expansion size must be a power of 2
+        if !JournalWriter::is_power_of_two(expand_size) { return false }
+        // Alignment must be no larger than max page size
+        if align > max_page_size { return false }
+        // If all checks pass, return true
+        true
     }
 
     fn init_mem_from(&self, start: usize) {
@@ -66,7 +101,7 @@ impl JournalWriter {
         ) as *mut u8;
     }
 
-    fn expand_if_needed(&mut self, data_size: usize) -> bool {
+    pub fn expand_if_needed(&mut self, data_size: usize) -> bool {
         // The size of the full record is:
         // STX byte (1 byte) +
         // u32 data length (4 bytes) +
@@ -264,8 +299,50 @@ mod tests {
     use storage::journal_writer::JournalWriter;
 
     #[test]
+    fn new_requires_initial_capacity_greater_than_zero() {
+        assert!(JournalWriter::new(0, 2, 2, 2).is_none());
+        assert!(JournalWriter::new(2, 2, 2, 2).is_some());
+    }
+
+    #[test]
+    fn new_requires_expansion_size_greater_than_zero() {
+        assert!(JournalWriter::new(2, 0, 2, 2).is_none());
+        assert!(JournalWriter::new(2, 2, 2, 2).is_some());
+    }
+
+    #[test]
+    fn new_requires_max_page_size_is_power_of_2() {
+        assert!(JournalWriter::new(5, 2, 2, 2).is_none());
+        assert!(JournalWriter::new(2, 2, 2, 2).is_some());
+    }
+
+    #[test]
+    fn new_requires_alignment_is_power_of_2() {
+        assert!(JournalWriter::new(2, 2, 2, 5).is_none());
+        assert!(JournalWriter::new(2, 2, 2, 2).is_some());
+    }
+
+    #[test]
+    fn new_requires_initial_capacity_is_power_of_2() {
+        assert!(JournalWriter::new(5, 2, 2, 2).is_none());
+        assert!(JournalWriter::new(2, 2, 2, 2).is_some());
+    }
+
+    #[test]
+    fn new_requires_expand_size_is_power_of_2() {
+        assert!(JournalWriter::new(2, 5, 2, 2).is_none());
+        assert!(JournalWriter::new(2, 2, 2, 2).is_some());
+    }
+
+    #[test]
+    fn new_requires_alignement_no_larger_than_page_size() {
+        assert!(JournalWriter::new(2, 2, 4, 2).is_none());
+        assert!(JournalWriter::new(2, 2, 2, 2).is_some());
+    }
+
+    #[test]
     fn new_sets_properties() {
-        let writer = JournalWriter::new(256, 512, 1024);
+        let writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         assert_eq!(256, writer.capacity());
         assert_eq!(512, writer.expand_size());
         assert_eq!(1024, writer.align());
@@ -273,14 +350,14 @@ mod tests {
 
     #[test]
     fn as_slice_returns_slice_with_capacity_length() {
-        let writer = JournalWriter::new(256, 512, 1024);
+        let writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         let slice = writer.as_slice();
         assert_eq!(slice.len(), writer.capacity());
     }
 
     #[test]
     fn new_inits_memory_to_zeroes() {
-        let writer = JournalWriter::new(256, 512, 1024);
+        let writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         let slice = writer.as_slice();
         for i in slice {
             assert_eq!(0x00, *i);
@@ -289,7 +366,7 @@ mod tests {
 
     #[test]
     fn as_slice_returns_empty_slice_after_forget() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.forget();
         let slice = writer.as_slice();
         assert_eq!(0, slice.len());
@@ -297,40 +374,40 @@ mod tests {
 
     #[test]
     fn capacity_is_zero_after_forget() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.forget();
         assert_eq!(0, writer.capacity());
     }
 
     #[test]
     fn storage_origin_returns_non_null_pointer() {
-        let writer = JournalWriter::new(256, 512, 1024);
+        let writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         assert!(!writer.storage_origin().is_null());
     }
 
     #[test]
     #[should_panic]
     fn storage_origin_panics_after_forget() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.forget();
         writer.storage_origin();
     }
 
     #[test]
     fn is_not_writing_when_new() {
-        let writer = JournalWriter::new(256, 512, 1024);
+        let writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         assert!(!writer.is_writing());
     }
 
     #[test]
     fn commit_returns_false_when_not_writing() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         assert!(!writer.commit());
     }
 
     #[test]
     fn commit_does_not_alter_contents_or_capacity_when_not_writing() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.commit();
         assert_eq!(256, writer.capacity());
         let slice = writer.as_slice();
@@ -341,27 +418,27 @@ mod tests {
 
     #[test]
     fn write_sets_is_writing_to_true() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         assert!(writer.is_writing());
     }
 
     #[test]
     fn write_returns_true_when_not_already_writing() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         assert!(writer.write(&[1, 2, 3]));
     }
 
     #[test]
     fn write_returns_false_when_already_writing() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         assert!(!writer.write(&[4, 5, 6]));
     }
 
     #[test]
     fn write_sets_data_except_end_byte() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         assert_eq!(
             [0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x00],
@@ -371,20 +448,20 @@ mod tests {
 
     #[test]
     fn discard_returns_false_when_not_writing() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         assert!(!writer.discard());
     }
 
     #[test]
     fn discard_returns_true_when_writing() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         assert!(writer.discard());
     }
 
     #[test]
     fn discard_zeroes_bytes() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         writer.discard();
         assert_eq!(
@@ -395,7 +472,7 @@ mod tests {
 
     #[test]
     fn commit_sets_end_byte() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         writer.commit();
         assert_eq!(
@@ -406,7 +483,7 @@ mod tests {
 
     #[test]
     fn discard_zeroes_only_uncommitted_bytes() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         writer.commit();
         writer.write(&[4, 5, 6]);
@@ -429,7 +506,7 @@ mod tests {
 
     #[test]
     fn write_sets_contents_in_place_of_discarded_record() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         writer.commit();
         writer.write(&[4, 5, 6]);
@@ -446,7 +523,7 @@ mod tests {
 
     #[test]
     fn commit_sets_end_bytes_on_multiple_records() {
-        let mut writer = JournalWriter::new(256, 512, 1024);
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
         writer.write(&[1, 2, 3]);
         writer.commit();
         writer.write(&[4, 5, 6]);
@@ -459,6 +536,15 @@ mod tests {
             writer.as_slice()[0..18]
         );
     }
+
+    /*
+    #[test]
+    fn heap_alloc_fail() {
+        //let ptr = unsafe { heap::allocate(usize::max_value(), 1024) as *const u8 };
+        let ptr = unsafe { heap::allocate(1024, 1023) as *const u8 };
+        assert!(ptr.is_null());
+    }
+    */
 
 
     
