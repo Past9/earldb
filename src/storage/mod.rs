@@ -1,4 +1,6 @@
 mod journal;
+mod binary_storage;
+mod memory_binary_storage;
 mod memory_journal;
 mod journal_writer;
 mod journal_reader;
