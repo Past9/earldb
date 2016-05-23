@@ -109,6 +109,7 @@ impl JournalReader {
     }
 
     pub fn size(&self) -> u32 {
+        if !self.has_start() { return 0 }
         *self.size_ref()
     }
 
@@ -174,6 +175,14 @@ mod tests {
         let reader = JournalReader::new(get_mem(256, 1024, &[]), 256, 1024);
         assert_eq!(256, reader.capacity());
         assert_eq!(1024, reader.align());
+    }
+
+    #[test]
+    fn storage_reallocated_changes_capacity() {
+        let mut reader = JournalReader::new(get_mem(256, 1024, &[]), 256, 1024);
+        let new_mem = get_mem(4096, 1024, &[]);
+        reader.storage_reallocated(new_mem, 4096);
+        assert_eq!(4096, reader.capacity());
     }
 
     #[test]
@@ -283,6 +292,185 @@ mod tests {
         assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
         assert_eq!(Some(vec!(0x04, 0x05, 0x06)), reader.next());
         assert_eq!(None, reader.next());
+    }
+
+    // Iterator trait ssanity check
+    #[test]
+    fn iterator_returns_correct_count() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(2, reader.count());
+    }
+
+    // Iterator trait ssanity check
+    #[test]
+    fn iterator_returns_correct_last() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x04, 0x05, 0x06)), reader.last());
+    }
+
+    #[test]
+    fn reset_allows_iteration_from_beginning() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(Some(vec!(0x04, 0x05, 0x06)), reader.next());
+        assert_eq!(None, reader.next());
+        reader.reset();
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(Some(vec!(0x04, 0x05, 0x06)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn jump_to_moves_to_record() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(9, false);
+        assert_eq!(Some(vec!(0x04, 0x05, 0x06)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn jump_to_bad_position_without_back_on_fail_does_not_go_back() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(10, false);
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn jump_to_bad_position_with_back_on_fail_does_not_go_back() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(10, true);
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(Some(vec!(0x04, 0x05, 0x06)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn size_returns_size_of_record_data() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x04, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x07, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(3, reader.size());
+        reader.next();
+        assert_eq!(4, reader.size());
+    }
+
+    #[test]
+    fn has_start_returns_true_when_start_byte_exists() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]), 
+            256, 
+            1024
+        );
+        assert!(reader.has_start());
+    }
+
+    #[test]
+    fn has_start_returns_false_when_no_start_byte() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]), 
+            256, 
+            1024
+        );
+        assert!(!reader.has_start());
+    }
+
+    #[test]
+    fn size_returns_zero_when_no_start_byte() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(0, reader.size());
+    }
+
+    #[test]
+    fn size_returns_size_when_start_byte_is_present() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(3, reader.size());
+    }
+
+    #[test]
+    fn has_end_returns_true_when_end_byte_exists() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert!(reader.has_end());
+    }
+
+    #[test]
+    fn has_end_returns_false_when_no_end_byte() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]), 
+            256, 
+            1024
+        );
+        assert!(!reader.has_end());
     }
 
 

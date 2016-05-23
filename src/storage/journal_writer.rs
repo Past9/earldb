@@ -208,6 +208,8 @@ impl JournalWriter {
     pub fn write(&mut self, data: &[u8]) -> bool {
         if self.is_writing { return false }
 
+        if data.len() == 0 { return false }
+
         // Lock the writer so that no other writes can take place until a commit
         // or discard
         self.is_writing = true;
@@ -461,6 +463,22 @@ mod tests {
         writer.write(&[1, 2, 3]);
         assert_eq!(
             [0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x00],
+            writer.as_slice()[0..9]
+        );
+    }
+
+    #[test]
+    fn write_returns_false_when_data_is_empty() {
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
+        assert!(!writer.write(&[]));
+    }
+
+    #[test]
+    fn write_does_not_alter_contents_when_data_is_empty() {
+        let mut writer = JournalWriter::new(256, 512, 1024, 4096).unwrap();
+        writer.write(&[]);
+        assert_eq!(
+            [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
             writer.as_slice()[0..9]
         );
     }
