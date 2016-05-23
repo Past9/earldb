@@ -69,6 +69,14 @@ impl JournalReader {
         *self.end_byte_ref() == 0x03
     }
 
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn align(&self) -> usize {
+        self.align
+    }
+
     pub fn storage_reallocated(&mut self, new_storage_origin: *const u8, new_capacity: usize) {
         self.storage_origin = Some(new_storage_origin);
         self.capacity = new_capacity;
@@ -78,7 +86,7 @@ impl JournalReader {
         self.record_offset = 0;
     }
 
-    pub fn jump_to(&mut self, offset: usize) -> bool {
+    pub fn jump_to(&mut self, offset: usize, back_on_fail: bool) -> bool {
         // Move to the requested offset, but remember the old one
         // so we can fall back to it if the record is incomplete
         let old_offset = self.record_offset; 
@@ -88,29 +96,37 @@ impl JournalReader {
         // (this means the record is complete and committed). If
         // so, return true to signify that the record can be read.
         if self.has_start() && self.has_end() {
-            return true;
+            true
+        } else {
+            // Otherwise return false to indicate that the data at the
+            // current position is not a valid and complete record.
+            // Fall back to the original offset if requested.
+            if back_on_fail {
+                self.record_offset = old_offset;
+            }
+            false
         }
-
-        // Otherwise return false to indicate that the data at the
-        // current position is not a valid and complete record
-        false
-    }
-
-    pub fn next(&mut self) -> bool {
-        let new_offset = self.record_offset + 1 + 4 + self.size() as usize + 1;
-        self.jump_to(new_offset) 
     }
 
     pub fn size(&self) -> u32 {
         *self.size_ref()
     }
 
-    pub fn read(&self) -> Option<Vec<u8>> {
-        if self.has_start() && self.has_end() {
-            Some(self.data_slice().to_vec())
-        } else {
-            None
-        }
+
+}
+impl Iterator for JournalReader {
+
+    type Item = Vec<u8>;
+
+    fn next(&mut self) -> Option<Vec<u8>> {
+        if !self.has_start() || !self.has_end() { return None };
+
+        let res = Some(self.data_slice().to_vec());
+
+        let new_offset = self.record_offset + 1 + 4 + self.size() as usize + 1;
+        self.jump_to(new_offset, false);
+
+        res
     }
 
 }
@@ -128,5 +144,147 @@ impl Drop for JournalReader {
             None => ()
         }
     }
+
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    #![feature(alloc, heap_api)]
+
+    extern crate alloc;
+    extern crate core;
+
+    use alloc::heap;
+    use std::{mem, ptr, slice};
+    use storage::journal_reader::JournalReader;
+
+    fn get_mem(size: usize, align: usize, data: &[u8]) -> *const u8 {
+        let ptr = unsafe { heap::allocate(size, align) as *mut u8 };
+        unsafe {
+            ptr::write_bytes(ptr, 0, size);
+            ptr::copy(data.as_ptr(), ptr, data.len());
+        }
+        ptr as *const u8
+    }
+
+    #[test]
+    fn new_sets_properties() {
+        let reader = JournalReader::new(get_mem(256, 1024, &[]), 256, 1024);
+        assert_eq!(256, reader.capacity());
+        assert_eq!(1024, reader.align());
+    }
+
+    #[test]
+    fn next_returns_none_when_first_record_is_empty() {
+        let mut reader = JournalReader::new(get_mem(256, 1024, &[]), 256, 1024);
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_none_when_only_start_marker_is_present_on_first_record() {
+        let mut reader = JournalReader::new(get_mem(256, 1024, &[0x02]), 256, 1024);
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_none_when_only_start_marker_and_size_are_present_on_first_record() {
+        let mut reader = JournalReader::new(get_mem(256, 1024, &[0x02, 0x03, 0x00, 0x00, 0x00]), 256, 1024);
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_none_when_no_end_marker_is_present_on_first_record() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x00]), 
+            256, 
+            1024
+        );
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_data_when_end_marker_is_present_on_first_record() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+    }
+
+    #[test]
+    fn next_returns_none_when_nth_record_is_empty() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_none_when_only_start_marker_is_present_on_nth_record() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_none_when_only_start_marker_and_size_are_present_on_nth_record() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_none_when_no_end_marker_is_present_on_nth_record() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x00
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+    #[test]
+    fn next_returns_data_when_end_marker_is_present_on_nth_record() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+        assert_eq!(Some(vec!(0x04, 0x05, 0x06)), reader.next());
+        assert_eq!(None, reader.next());
+    }
+
+
 
 }

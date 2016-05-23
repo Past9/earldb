@@ -102,6 +102,8 @@ impl JournalWriter {
         ) as *mut u8;
     }
 
+    /// Expands in increments of expand_size untilthere is enough room for a record
+    /// with the given size
     pub fn expand_if_needed(&mut self, data_size: usize) -> bool {
         // The size of the full record is:
         // STX byte (1 byte) +
@@ -156,6 +158,7 @@ impl JournalWriter {
 
     }
 
+    /// Returns the entire memory as a slice
     pub fn as_slice(&self) -> &[u8] {
         match self.storage_origin {
             Some(x) => unsafe { slice::from_raw_parts(x, self.capacity) },
@@ -163,19 +166,26 @@ impl JournalWriter {
         }
     }
 
+    /// Releases ownership of the storage pointer without deallocating the memory.
+    /// Used to prevent double-free when the memory is shared and will be 
+    /// deallocated elsewhere.
     pub fn forget(&mut self) {
         self.storage_origin = None;
         self.capacity = 0;
     }
 
+    /// Returns the increment (in bytes) by which the storage should expand to make 
+    /// room for new records
     pub fn expand_size(&self) -> usize {
         self.expand_size
     }
 
+    /// Returns the memory alignment of the storage
     pub fn align(&self) -> usize {
         self.align
     }
 
+    /// Returns a pointer to the beginning of the memory used for storing records
     pub fn storage_origin(&self) -> *const u8 {
         self.storage_origin.unwrap()
     }

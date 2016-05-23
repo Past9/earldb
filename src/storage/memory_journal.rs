@@ -73,20 +73,24 @@ impl Journal for MemoryJournal {
         self.writer.discard()
     }
 
+    /*
     fn next(&mut self) -> bool {
         if !self.is_open { return false }
-        self.reader.next()
+        self.reader.try_next()
     }
+    */
 
     fn size(&self) -> u32 {
         if !self.is_open { return 0 }
         self.reader.size()
     }
 
+    /*
     fn read(&self) -> Option<Vec<u8>> {
         if !self.is_open { return None }
-        self.reader.read()
+        self.reader.next()
     }
+    */
 
     fn is_writing(&self) -> bool {
         if !self.is_open { return false }
