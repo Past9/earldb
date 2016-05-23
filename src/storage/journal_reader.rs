@@ -62,11 +62,21 @@ impl JournalReader {
     }
 
     fn has_start(&self) -> bool {
+        // Check to make sure the start byte position is in allocated memory
+        if !self.is_in_bounds(self.record_offset, 1) { return false }
         *self.start_byte_ref() == 0x02
     }
 
     fn has_end(&self) -> bool {
+        // Check to make sure the size bytes position is in allocated memory
+        if !self.is_in_bounds(self.record_offset + 1, 4) { return false }
+        // Check to make sure the end byte position is in allocated memory
+        if !self.is_in_bounds(self.record_offset + 1 + 4 + self.size() as usize, 1) { return false }
         *self.end_byte_ref() == 0x03
+    }
+
+    fn is_in_bounds(&self, offset: usize, length: usize) -> bool {
+        return offset + length <= self.capacity;
     }
 
     pub fn capacity(&self) -> usize {
@@ -87,6 +97,10 @@ impl JournalReader {
     }
 
     pub fn jump_to(&mut self, offset: usize, back_on_fail: bool) -> bool {
+        // Returns false if the requested location is out of bounds
+        if offset >= self.capacity { return false }
+
+
         // Move to the requested offset, but remember the old one
         // so we can fall back to it if the record is incomplete
         let old_offset = self.record_offset; 
@@ -109,6 +123,7 @@ impl JournalReader {
     }
 
     pub fn size(&self) -> u32 {
+        if !self.is_in_bounds(self.record_offset + 1, 4) { return 0 }
         if !self.has_start() { return 0 }
         *self.size_ref()
     }
@@ -161,10 +176,10 @@ mod tests {
     use std::{mem, ptr, slice};
     use storage::journal_reader::JournalReader;
 
-    fn get_mem(size: usize, align: usize, data: &[u8]) -> *const u8 {
+    fn get_mem(size: usize, align: usize, fill: u8, data: &[u8]) -> *const u8 {
         let ptr = unsafe { heap::allocate(size, align) as *mut u8 };
         unsafe {
-            ptr::write_bytes(ptr, 0, size);
+            ptr::write_bytes(ptr, fill, size);
             ptr::copy(data.as_ptr(), ptr, data.len());
         }
         ptr as *const u8
@@ -172,41 +187,41 @@ mod tests {
 
     #[test]
     fn new_sets_properties() {
-        let reader = JournalReader::new(get_mem(256, 1024, &[]), 256, 1024);
+        let reader = JournalReader::new(get_mem(256, 1024, 0x00, &[]), 256, 1024);
         assert_eq!(256, reader.capacity());
         assert_eq!(1024, reader.align());
     }
 
     #[test]
     fn storage_reallocated_changes_capacity() {
-        let mut reader = JournalReader::new(get_mem(256, 1024, &[]), 256, 1024);
-        let new_mem = get_mem(4096, 1024, &[]);
+        let mut reader = JournalReader::new(get_mem(256, 1024, 0x00, &[]), 256, 1024);
+        let new_mem = get_mem(4096, 1024, 0x00, &[]);
         reader.storage_reallocated(new_mem, 4096);
         assert_eq!(4096, reader.capacity());
     }
 
     #[test]
     fn next_returns_none_when_first_record_is_empty() {
-        let mut reader = JournalReader::new(get_mem(256, 1024, &[]), 256, 1024);
+        let mut reader = JournalReader::new(get_mem(256, 1024, 0x00, &[]), 256, 1024);
         assert_eq!(None, reader.next());
     }
 
     #[test]
     fn next_returns_none_when_only_start_marker_is_present_on_first_record() {
-        let mut reader = JournalReader::new(get_mem(256, 1024, &[0x02]), 256, 1024);
+        let mut reader = JournalReader::new(get_mem(256, 1024, 0x00, &[0x02]), 256, 1024);
         assert_eq!(None, reader.next());
     }
 
     #[test]
     fn next_returns_none_when_only_start_marker_and_size_are_present_on_first_record() {
-        let mut reader = JournalReader::new(get_mem(256, 1024, &[0x02, 0x03, 0x00, 0x00, 0x00]), 256, 1024);
+        let mut reader = JournalReader::new(get_mem(256, 1024, 0x00, &[0x02, 0x03, 0x00, 0x00, 0x00]), 256, 1024);
         assert_eq!(None, reader.next());
     }
 
     #[test]
     fn next_returns_none_when_no_end_marker_is_present_on_first_record() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x00]), 
+            get_mem(256, 1024, 0x00, &[0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x00]), 
             256, 
             1024
         );
@@ -216,7 +231,7 @@ mod tests {
     #[test]
     fn next_returns_data_when_end_marker_is_present_on_first_record() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03]), 
+            get_mem(256, 1024, 0x00, &[0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03]), 
             256, 
             1024
         );
@@ -226,7 +241,7 @@ mod tests {
     #[test]
     fn next_returns_none_when_nth_record_is_empty() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
             ]), 
@@ -240,7 +255,7 @@ mod tests {
     #[test]
     fn next_returns_none_when_only_start_marker_is_present_on_nth_record() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
             ]), 
@@ -254,7 +269,7 @@ mod tests {
     #[test]
     fn next_returns_none_when_only_start_marker_and_size_are_present_on_nth_record() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
             ]), 
@@ -268,7 +283,7 @@ mod tests {
     #[test]
     fn next_returns_none_when_no_end_marker_is_present_on_nth_record() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x00
             ]), 
@@ -282,7 +297,7 @@ mod tests {
     #[test]
     fn next_returns_data_when_end_marker_is_present_on_nth_record() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
             ]), 
@@ -298,7 +313,7 @@ mod tests {
     #[test]
     fn iterator_returns_correct_count() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
             ]), 
@@ -312,7 +327,7 @@ mod tests {
     #[test]
     fn iterator_returns_correct_last() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
             ]), 
@@ -325,7 +340,7 @@ mod tests {
     #[test]
     fn reset_allows_iteration_from_beginning() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
             ]), 
@@ -342,9 +357,76 @@ mod tests {
     }
 
     #[test]
+    fn jump_to_good_record_returns_true() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x00, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert!(reader.jump_to(9, false));
+    }
+
+    #[test]
+    fn jump_to_bad_record_returns_false() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x00, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert!(!reader.jump_to(10, false));
+    }
+
+    #[test]
+    fn jump_to_out_of_bounds_location_returns_false() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x00, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        assert!(!reader.jump_to(10000, false));
+    }
+
+    #[test]
+    fn jump_to_out_of_bounds_location_goes_back_when_back_on_fail_is_true() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x00, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(10000, true);
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+    }
+
+    #[test]
+    fn jump_to_out_of_bounds_location_does_not_jump_even_when_back_on_fail_is_false() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x00, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(10000, false);
+        assert_eq!(Some(vec!(0x01, 0x02, 0x03)), reader.next());
+    }
+
+    #[test]
     fn jump_to_moves_to_record() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
             ]), 
@@ -359,7 +441,7 @@ mod tests {
     #[test]
     fn jump_to_bad_position_without_back_on_fail_does_not_go_back() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
             ]), 
@@ -373,7 +455,7 @@ mod tests {
     #[test]
     fn jump_to_bad_position_with_back_on_fail_does_not_go_back() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x03
             ]), 
@@ -389,7 +471,7 @@ mod tests {
     #[test]
     fn size_returns_size_of_record_data() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03,
                 0x02, 0x04, 0x00, 0x00, 0x00, 0x04, 0x05, 0x06, 0x07, 0x03
             ]), 
@@ -404,7 +486,7 @@ mod tests {
     #[test]
     fn has_start_returns_true_when_start_byte_exists() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
             ]), 
             256, 
@@ -416,7 +498,7 @@ mod tests {
     #[test]
     fn has_start_returns_false_when_no_start_byte() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
             ]), 
             256, 
@@ -426,9 +508,22 @@ mod tests {
     }
 
     #[test]
+    fn has_start_returns_false_when_start_byte_is_out_of_bounds() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x00, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(255, false);
+        assert!(!reader.has_start());
+    }
+
+    #[test]
     fn size_returns_zero_when_no_start_byte() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03
             ]), 
             256, 
@@ -438,9 +533,22 @@ mod tests {
     }
 
     #[test]
+    fn size_returns_zero_when_size_bytes_are_out_of_bounds() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x01, &[
+                0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(1000, false);
+        assert_eq!(0, reader.size());
+    }
+
+    #[test]
     fn size_returns_size_when_start_byte_is_present() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x03
             ]), 
             256, 
@@ -452,7 +560,7 @@ mod tests {
     #[test]
     fn has_end_returns_true_when_end_byte_exists() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x00, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03
             ]), 
             256, 
@@ -462,9 +570,22 @@ mod tests {
     }
 
     #[test]
+    fn has_end_returns_false_when_end_byte_is_out_of_bounds() {
+        let mut reader = JournalReader::new(
+            get_mem(256, 1024, 0x03, &[
+                0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03
+            ]), 
+            256, 
+            1024
+        );
+        reader.jump_to(255, false);
+        assert!(!reader.has_end());
+    }
+
+    #[test]
     fn has_end_returns_false_when_no_end_byte() {
         let mut reader = JournalReader::new(
-            get_mem(256, 1024, &[
+            get_mem(256, 1024, 0x03, &[
                 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
             ]), 
             256, 
