@@ -28,7 +28,7 @@ impl MemoryBinaryStorage {
     ) -> MemoryBinaryStorage {
 
         let origin = unsafe { heap::allocate(initial_capacity, align) as *mut u8 };
-        unsafe { ptr::write_bytes::<u8>(origin, 0x2, initial_capacity) };
+        unsafe { ptr::write_bytes::<u8>(origin, 0x0, initial_capacity) };
 
         MemoryBinaryStorage {
             origin: origin as *const u8,
@@ -62,10 +62,6 @@ impl MemoryBinaryStorage {
     fn read<T: Copy>(&self, offset: usize) -> Option<T> {
         if !self.is_open { return None }
         if self.use_txn_boundary && (offset + mem::size_of::<T>()) >= self.txn_boundary { return None }
-
-        let slice = unsafe {
-            slice::from_raw_parts::<u8>(self.ptr(offset), 10)
-        };
 
         unsafe { Some(ptr::read(self.ptr(offset))) }
     }
@@ -138,7 +134,9 @@ impl BinaryStorage for MemoryBinaryStorage {
         if self.use_txn_boundary && offset < self.txn_boundary { return false }
         if !self.expand(offset + data.len()) { return false }
 
-        unsafe { ptr::write(self.ptr_mut(offset), data) }
+        let dest = unsafe { slice::from_raw_parts_mut(self.ptr_mut(offset), data.len()) };
+        dest.clone_from_slice(data);
+
         true
     }
 
@@ -200,7 +198,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         if !self.is_open { return None }
         if self.use_txn_boundary && (offset + len) >= self.txn_boundary { return None }
 
-        unsafe { Some(ptr::read(self.ptr(offset))) }
+        unsafe { Some(slice::from_raw_parts(self.ptr(offset), len)) }
     }
 
     fn r_str(&self, offset: usize, len: usize) -> Option<&str> {
@@ -324,7 +322,7 @@ impl BinaryStorage for MemoryBinaryStorage {
 #[cfg(test)]
 mod tests {
 
-    use std::u8;
+    use std::mem;
 
     use storage::binary_storage::BinaryStorage;
     use storage::memory_binary_storage::MemoryBinaryStorage;
@@ -604,6 +602,8 @@ mod tests {
         s.open();
         s.w_i8(0, i8::max_value());
         assert_eq!(i8::max_value(), s.r_i8(0).unwrap());
+        s.w_i8(mem::size_of::<i8>(), i8::min_value());
+        assert_eq!(i8::min_value(), s.r_i8(mem::size_of::<i8>()).unwrap());
     }
 
     #[test]
@@ -612,6 +612,8 @@ mod tests {
         s.open();
         s.w_i16(0, i16::max_value());
         assert_eq!(i16::max_value(), s.r_i16(0).unwrap());
+        s.w_i16(mem::size_of::<i16>(), i16::min_value());
+        assert_eq!(i16::min_value(), s.r_i16(mem::size_of::<i16>()).unwrap());
     }
 
     #[test]
@@ -620,6 +622,8 @@ mod tests {
         s.open();
         s.w_i32(0, i32::max_value());
         assert_eq!(i32::max_value(), s.r_i32(0).unwrap());
+        s.w_i32(mem::size_of::<i32>(), i32::min_value());
+        assert_eq!(i32::min_value(), s.r_i32(mem::size_of::<i32>()).unwrap());
     }
 
     #[test]
@@ -628,6 +632,8 @@ mod tests {
         s.open();
         s.w_i64(0, i64::max_value());
         assert_eq!(i64::max_value(), s.r_i64(0).unwrap());
+        s.w_i64(mem::size_of::<i64>(), i64::min_value());
+        assert_eq!(i64::min_value(), s.r_i64(mem::size_of::<i64>()).unwrap());
     }
 
     #[test]
@@ -636,6 +642,8 @@ mod tests {
         s.open();
         s.w_u8(0, u8::max_value());
         assert_eq!(u8::max_value(), s.r_u8(0).unwrap());
+        s.w_u8(mem::size_of::<u8>(), u8::min_value());
+        assert_eq!(u8::min_value(), s.r_u8(mem::size_of::<u8>()).unwrap());
     }
 
     #[test]
@@ -644,6 +652,8 @@ mod tests {
         s.open();
         s.w_u16(0, u16::max_value());
         assert_eq!(u16::max_value(), s.r_u16(0).unwrap());
+        s.w_u16(mem::size_of::<u16>(), u16::min_value());
+        assert_eq!(u16::min_value(), s.r_u16(mem::size_of::<u16>()).unwrap());
     }
 
     #[test]
@@ -652,6 +662,8 @@ mod tests {
         s.open();
         s.w_u32(0, u32::max_value());
         assert_eq!(u32::max_value(), s.r_u32(0).unwrap());
+        s.w_u32(mem::size_of::<u32>(), u32::min_value());
+        assert_eq!(u32::min_value(), s.r_u32(mem::size_of::<u32>()).unwrap());
     }
 
     #[test]
@@ -660,6 +672,8 @@ mod tests {
         s.open();
         s.w_u64(0, u64::max_value());
         assert_eq!(u64::max_value(), s.r_u64(0).unwrap());
+        s.w_u64(mem::size_of::<u64>(), u64::min_value());
+        assert_eq!(u64::min_value(), s.r_u64(mem::size_of::<u64>()).unwrap());
     }
 
     #[test]
@@ -668,6 +682,8 @@ mod tests {
         s.open();
         s.w_f32(0, 12345.6789);
         assert_eq!(12345.6789, s.r_f32(0).unwrap());
+        s.w_f32(mem::size_of::<f32>(), -0.0004321);
+        assert_eq!(-0.0004321, s.r_f32(mem::size_of::<f32>()).unwrap());
     }
 
     #[test]
@@ -676,6 +692,8 @@ mod tests {
         s.open();
         s.w_f64(0, 12345.6789);
         assert_eq!(12345.6789, s.r_f64(0).unwrap());
+        s.w_f64(mem::size_of::<f64>(), -0.0004321);
+        assert_eq!(-0.0004321, s.r_f64(mem::size_of::<f64>()).unwrap());
     }
 
     #[test]
@@ -684,8 +702,8 @@ mod tests {
         s.open();
         s.w_bool(0, true);
         assert_eq!(true, s.r_bool(0).unwrap());
-        s.w_bool(0, false);
-        assert_eq!(false, s.r_bool(0).unwrap());
+        s.w_bool(mem::size_of::<bool>(), false);
+        assert_eq!(false, s.r_bool(mem::size_of::<bool>()).unwrap());
     }
 
     #[test]
@@ -694,6 +712,8 @@ mod tests {
         s.open();
         s.w_bytes(0, &[0x0, 0x1, 0x2, 0x3]);
         assert_eq!(&[0x0, 0x1, 0x2, 0x3], s.r_bytes(0, 4).unwrap());
+        s.w_bytes(4, &[0x4, 0x5, 0x6, 0x7]);
+        assert_eq!(&[0x4, 0x5, 0x6, 0x7], s.r_bytes(4, 4).unwrap());
     }
 
     #[test]
@@ -702,8 +722,11 @@ mod tests {
         s.open();
         s.w_str(0, "foobar");
         assert_eq!("foobar", s.r_str(0, 6).unwrap());
+        s.w_str(6, "bazquux");
+        assert_eq!("bazquux", s.r_str(6, 7).unwrap());
     }
 
+    
 
 
 
