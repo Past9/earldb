@@ -20,7 +20,7 @@ pub trait BinaryStorage {
 
     fn w_bool(&mut self, offset: usize, data: bool) -> bool;
 
-    fn w_slice(&mut self, offset: usize, data: &[u8]) -> bool;
+    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> bool;
     fn w_str(&mut self, offset: usize, data: &str) -> bool;
 
 
@@ -39,7 +39,7 @@ pub trait BinaryStorage {
 
     fn r_bool(&self, offset: usize) -> Option<bool>;
 
-    fn r_slice(&self, offset: usize, len: usize) -> Option<&[u8]>;
+    fn r_bytes(&self, offset: usize, len: usize) -> Option<&[u8]>;
     fn r_str(&self, offset: usize, len: usize) -> Option<&str>;
 
     fn fill(&mut self, start: Option<usize>, end: Option<usize>, val: u8) -> bool;
