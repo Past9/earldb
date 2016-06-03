@@ -1873,6 +1873,89 @@ mod tests {
         assert_eq!(256, s.get_capacity());
     }
 
+    // assert_filled() tests
+    #[test]
+    fn assert_filled_retuns_false_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(!s.assert_filled(None, None, 0x0));
+    }
+
+    #[test]
+    fn assert_filled_returns_false_when_start_offset_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.assert_filled(Some(255), None, 0x0));
+        assert!(!s.assert_filled(Some(256), None, 0x0));
+    }
+
+    #[test]
+    fn assert_filled_returns_false_when_end_offset_at_or_before_start_offset() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.assert_filled(Some(10), Some(11), 0x0));
+        assert!(!s.assert_filled(Some(10), Some(10), 0x0));
+        assert!(!s.assert_filled(Some(10), Some(9), 0x0));
+    }
+
+    #[test]
+    fn assert_filled_returns_false_when_end_offset_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.assert_filled(Some(10), Some(256), 0x0));
+        assert!(!s.assert_filled(Some(10), Some(257), 0x0));
+    }
+
+    #[test]
+    fn assert_filled_checks_whether_all_bytes_in_range_match_value() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(10), Some(20), 0x1);
+        assert!(s.assert_filled(None, Some(10), 0x0));
+        assert!(!s.assert_filled(None, Some(11), 0x0));
+        assert!(s.assert_filled(Some(10), Some(20), 0x1));
+        assert!(!s.assert_filled(Some(9), Some(20), 0x1));
+        assert!(!s.assert_filled(Some(10), Some(21), 0x1));
+        assert!(s.assert_filled(Some(20), None, 0x0));
+        assert!(!s.assert_filled(Some(19), None, 0x0));
+    }
+
+    #[test]
+    fn assert_filled_starts_from_start_offset() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(0), Some(10), 0x1);
+        assert!(s.assert_filled(Some(10), None, 0x0));
+        assert!(!s.assert_filled(Some(9), None, 0x0));
+    }
+
+    #[test]
+    fn assert_filled_starts_from_beginning_when_start_offset_is_none() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(1), None, 0x1);
+        assert!(s.assert_filled(None, Some(1), 0x0));
+        assert!(!s.assert_filled(Some(1), Some(2), 0x0));
+    }
+
+    #[test]
+    fn assert_filled_goes_to_end_offset() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(250), None, 0x1);
+        assert!(s.assert_filled(None, Some(250), 0x0));
+        assert!(!s.assert_filled(None, Some(251), 0x0));
+    }
+
+    #[test]
+    fn assert_filled_goes_to_end_when_end_offset_is_none() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(255), None, 0x1);
+        assert!(s.assert_filled(None, Some(255), 0x0));
+        assert!(!s.assert_filled(None, None, 0x0));
+    }
+
+
 
 
 }
