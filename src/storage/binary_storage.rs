@@ -5,6 +5,8 @@ pub trait BinaryStorage {
     fn open(&mut self) -> bool;
     fn close(&mut self) -> bool;
 
+    fn is_open(&self) -> bool;
+
     fn w_i8(&mut self, offset: usize, data: i8) -> bool;
     fn w_i16(&mut self, offset: usize, data: i16) -> bool;
     fn w_i32(&mut self, offset: usize, data: i32) -> bool;
@@ -52,13 +54,16 @@ pub trait BinaryStorage {
     fn set_txn_boundary(&mut self, offset: usize) -> bool;
 
     fn get_expand_size(&self) -> usize;
-    fn set_expand_size(&mut self) -> usize;
+    fn set_expand_size(&mut self, expand_size: usize);
+
+    fn get_align(&self) -> usize;
+    fn set_align(&mut self, align: usize);
+
+    fn get_capacity(&self) -> usize;
+
+    fn get_max_page_size(&self) -> usize;
 
     fn expand(&mut self, min_capacity: usize) -> bool;
-    fn capacity(&self) -> usize;
-
-    fn is_open(&self) -> bool;
-
 
 
 }
