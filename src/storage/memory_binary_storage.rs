@@ -165,7 +165,8 @@ impl BinaryStorage for MemoryBinaryStorage {
 
     fn r_bytes(&self, offset: usize, len: usize) -> Option<&[u8]> {
         if !self.is_open { return None }
-        if self.use_txn_boundary && (offset + len) >= self.txn_boundary { return None }
+        if self.use_txn_boundary && (offset + len) > self.txn_boundary { return None }
+        if offset + len > self.capacity { return None }
 
         unsafe { Some(slice::from_raw_parts(self.ptr(offset), len)) }
     }
@@ -1605,6 +1606,154 @@ mod tests {
         assert!(s.r_f64(248).is_some());
         assert!(s.r_f64(252).is_none());
         assert!(s.r_f64(256).is_none());
+    }
+
+    // r_bool() tests
+    #[test]
+    fn r_bool_returns_none_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(s.r_bool(0).is_none());
+    }
+
+    #[test]
+    fn r_bool_returns_some_when_open() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.r_bool(0).is_some());
+    }
+
+    #[test]
+    fn r_bool_reads_false_from_unwritten_storage() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(false, s.r_bool(0).unwrap());
+    }
+
+    #[test]
+    fn r_bool_reads_written_data() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.w_bool(0, false);
+        assert_eq!(false, s.r_bool(0).unwrap());
+        s.w_bool(32, true);
+        assert_eq!(true, s.r_bool(32).unwrap());
+    }
+
+    #[test]
+    fn r_bool_does_not_read_past_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(8);
+        assert!(s.r_bool(7).is_some());
+        assert!(s.r_bool(8).is_none());
+    }
+
+    #[test]
+    fn r_bool_does_not_read_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.r_bool(255).is_some());
+        assert!(s.r_bool(256).is_none());
+    }
+
+    // r_bytes() tests
+    #[test]
+    fn r_bytes_returns_none_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(s.r_bytes(0, 5).is_none());
+    }
+
+    #[test]
+    fn r_bytes_returns_some_when_open() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.r_bytes(0, 5).is_some());
+    }
+
+    #[test]
+    fn r_bytes_reads_zeros_from_unwritten_storage() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(&[0x0, 0x0, 0x0, 0x0, 0x0], s.r_bytes(0, 5).unwrap());
+    }
+
+    #[test]
+    fn r_bytes_reads_written_data() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.w_bytes(0, &[0x0, 0x1, 0x2, 0x3, 0x4]);
+        assert_eq!(&[0x0, 0x1, 0x2, 0x3, 0x4], s.r_bytes(0, 5).unwrap());
+        s.w_bytes(32, &[0x5, 0x6, 0x7, 0x8, 0x9]);
+        assert_eq!(&[0x5, 0x6, 0x7, 0x8, 0x9], s.r_bytes(32, 5).unwrap());
+    }
+
+    #[test]
+    fn r_bytes_does_not_read_past_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(8);
+        assert!(s.r_bytes(6, 2).is_some());
+        assert!(s.r_bytes(7, 2).is_none());
+        assert!(s.r_bytes(8, 2).is_none());
+    }
+
+    #[test]
+    fn r_bytes_does_not_read_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.r_bytes(254, 2).is_some());
+        assert!(s.r_bytes(255, 2).is_none());
+        assert!(s.r_bytes(256, 2).is_none());
+    }
+
+    // r_str() tests
+    #[test]
+    fn r_str_returns_none_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(s.r_str(0, 5).is_none());
+    }
+
+    #[test]
+    fn r_str_returns_some_when_open() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.r_str(0, 5).is_some());
+    }
+
+    #[test]
+    fn r_str_reads_nulls_from_unwritten_storage() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), s.r_str(0, 5).unwrap());
+    }
+
+    #[test]
+    fn r_str_reads_written_data() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.w_str(0, "foobar");
+        assert_eq!("foobar", s.r_str(0, 6).unwrap());
+        s.w_str(32, "I \u{2661} Rust");
+        assert_eq!("I \u{2661} Rust", s.r_str(32, 10).unwrap());
+    }
+
+    #[test]
+    fn r_str_does_not_read_past_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(8);
+        assert!(s.r_str(6, 2).is_some());
+        assert!(s.r_str(7, 2).is_none());
+        assert!(s.r_str(8, 2).is_none());
+    }
+
+    #[test]
+    fn r_str_does_not_read_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.r_str(254, 2).is_some());
+        assert!(s.r_str(255, 2).is_none());
+        assert!(s.r_str(256, 2).is_none());
     }
 
     /*
