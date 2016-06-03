@@ -103,6 +103,10 @@ impl MemoryBinaryStorage {
         true
     }
 
+    fn check_expand_size(expand_size: usize) -> bool {
+        unimplemented!() 
+    }
+
 
 }
 impl BinaryStorage for MemoryBinaryStorage {
@@ -235,6 +239,7 @@ impl BinaryStorage for MemoryBinaryStorage {
 
     fn set_use_txn_boundary(&mut self, val: bool) {
         self.use_txn_boundary = val;
+        if !val { self.txn_boundary = 0 }
     }
 
 
@@ -1955,6 +1960,109 @@ mod tests {
         assert!(!s.assert_filled(None, None, 0x0));
     }
 
+    // get_use_txn_boundary(), set_use_txn_boundary(), get_txn_boundary(), and set_txn_boundary() tests
+    #[test]
+    fn get_use_txn_boundary_returns_initialized_value() {
+        let s1 = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(!s1.get_use_txn_boundary());
+        let s2 = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        assert!(s2.get_use_txn_boundary());
+    }
+
+    #[test]
+    fn set_use_txn_boundary_changes_value() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.set_use_txn_boundary(true);
+        assert!(s.get_use_txn_boundary());
+        s.set_use_txn_boundary(false);
+        assert!(!s.get_use_txn_boundary());
+    }
+
+    #[test]
+    fn set_use_txn_boundary_resets_boundary_to_zero_when_false() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(10);
+        assert_eq!(10, s.get_txn_boundary());
+        s.set_use_txn_boundary(false);
+        assert_eq!(0, s.get_txn_boundary());
+        s.set_use_txn_boundary(true);
+        assert_eq!(0, s.get_txn_boundary());
+    }
+
+    #[test]
+    fn get_txn_boundary_starts_at_0_whether_used_or_not() {
+        let s1 = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert_eq!(0, s1.get_txn_boundary());
+        let s2 = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        assert_eq!(0, s2.get_txn_boundary());
+    }
+
+    #[test]
+    fn set_txn_boundary_returns_false_when_not_using_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(!s.set_txn_boundary(10));
+    }
+
+    #[test]
+    fn set_txn_boundary_does_not_change_boundary_when_not_using_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(10);
+        assert_eq!(0, s.get_txn_boundary());
+    }
+
+    #[test]
+    fn set_txn_boundary_returns_false_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        assert!(!s.set_txn_boundary(10));
+    }
+
+    #[test]
+    fn set_txn_boundary_does_not_change_boundary_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.set_txn_boundary(10);
+        s.open();
+        assert_eq!(0, s.get_txn_boundary());
+    }
+
+    #[test]
+    fn set_txn_boundary_returns_false_when_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        assert!(!s.set_txn_boundary(257));
+        assert!(s.set_txn_boundary(256));
+    }
+
+    #[test]
+    fn set_txn_boundary_does_not_change_boundary_when_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(257);
+        assert_eq!(0, s.get_txn_boundary());
+    }
+
+    #[test]
+    fn set_txn_boundary_does_not_expand_capacity_when_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(256, s.get_capacity());
+        s.set_txn_boundary(257);
+        assert_eq!(256, s.get_capacity());
+    }
+
+    #[test]
+    fn set_txn_boundary_changes_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(50);
+        assert_eq!(50, s.get_txn_boundary());
+        s.set_txn_boundary(25);
+        assert_eq!(25, s.get_txn_boundary());
+        s.set_txn_boundary(200);
+        assert_eq!(200, s.get_txn_boundary());
+    }
 
 
 
