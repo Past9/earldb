@@ -327,7 +327,7 @@ impl BinaryStorage for MemoryBinaryStorage {
 #[cfg(test)]
 mod tests {
 
-    use std::mem;
+    use std::{mem, str};
 
     use storage::binary_storage::BinaryStorage;
     use storage::memory_binary_storage::MemoryBinaryStorage;
@@ -956,17 +956,194 @@ mod tests {
         assert_eq!(true, s2.r_bool(4).unwrap());
     }
 
-    /*
     #[test]
     fn w_bool_over_capacity_expands_storage() {
         let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
         s.open();
         assert_eq!(256, s.get_capacity());
-        assert!(s.w_f64(256, 12345.6789));
+        assert!(s.w_bool(256, true));
         assert_eq!(512, s.get_capacity());
-        assert_eq!(12345.6789, s.r_f64(256).unwrap());
+        assert_eq!(true, s.r_bool(256).unwrap());
+    }
+
+    // w_bytes() tests
+    #[test]
+    fn w_bytes_returns_false_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(!s.w_bytes(0, &[0x0, 0x1, 0x2, 0x3, 0x4]));
+    }
+
+    #[test]
+    fn w_bytes_returns_true_when_open() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.w_bytes(0, &[0x0, 0x1, 0x2, 0x3, 0x4]));
+    }
+
+    #[test]
+    fn w_bytes_does_not_write_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.w_bytes(0, &[0x0, 0x1, 0x2, 0x3, 0x4]);
+        s.open();
+        assert_eq!(&[0x0, 0x0, 0x0, 0x0, 0x0], s.r_bytes(0, 5).unwrap());
+    }
+
+    #[test]
+    fn w_bytes_does_not_write_before_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(8);
+        assert!(!s.w_bytes(7, &[0x0, 0x1, 0x2, 0x3, 0x4]));
+        assert!(s.w_bytes(8, &[0x0, 0x1, 0x2, 0x3, 0x4]));
+        s.set_txn_boundary(16);
+        assert_eq!(&[0x0, 0x0, 0x0, 0x0, 0x0], s.r_bytes(3, 5).unwrap());
+        assert_eq!(&[0x0, 0x1, 0x2, 0x3, 0x4], s.r_bytes(8, 5).unwrap());
+    }
+
+    #[test]
+    fn w_bytes_over_capacity_expands_storage() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(256, s.get_capacity());
+        assert!(s.w_bytes(255, &[0x0, 0x1]));
+        assert_eq!(512, s.get_capacity());
+        assert_eq!(&[0x0, 0x1], s.r_bytes(255, 2).unwrap());
+    }
+
+    #[test]
+    fn w_bytes_over_capacity_expands_storage_multiple_times() {
+        let mut s = MemoryBinaryStorage::new(256, 4, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(256, s.get_capacity());
+        assert!(s.w_bytes(255, &[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6]));
+        assert_eq!(264, s.get_capacity());
+        assert_eq!(&[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6], s.r_bytes(255, 7).unwrap());
+    }
+
+    // w_str() tests
+    #[test]
+    fn w_str_returns_false_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(!s.w_str(0, "foobar"));
+        assert!(!s.w_str(0, "I \u{2661} Rust"));
+    }
+
+    #[test]
+    fn w_str_returns_true_when_open() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.w_str(0, "foobar"));
+        assert!(s.w_str(0, "I \u{2661} Rust"));
+    }
+
+    #[test]
+    fn w_str_does_not_write_when_closed() {
+        let mut s1 = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s1.w_str(0, "foobar");
+        s1.open();
+        assert_eq!(str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), s1.r_str(0, 6).unwrap());
+
+        let mut s2 = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s2.w_str(0, "I \u{2661} Rust");
+        s2.open();
+        assert_eq!(
+            str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), 
+            s2.r_str(0, 10).unwrap()
+        );
+    }
+
+    #[test]
+    fn w_str_does_not_write_before_txn_boundary() {
+        let mut s1 = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s1.open();
+        s1.set_txn_boundary(8);
+        assert!(!s1.w_str(7, "foobar"));
+        assert!(s1.w_str(8, "foobar"));
+        s1.set_txn_boundary(16);
+        assert_eq!(str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), s1.r_str(2, 6).unwrap());
+        assert_eq!("foobar", s1.r_str(8, 6).unwrap());
+
+        let mut s2 = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s2.open();
+        s2.set_txn_boundary(16);
+        assert!(!s2.w_str(15, "I \u{2661} Rust"));
+        assert!(s2.w_str(16, "I \u{2661} Rust"));
+        s2.set_txn_boundary(32);
+        assert_eq!(
+            str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), 
+            s2.r_str(6, 10).unwrap()
+        );
+        assert_eq!("I \u{2661} Rust", s2.r_str(16, 10).unwrap());
+    }
+
+    #[test]
+    fn w_str_over_capacity_expands_storage() {
+        let mut s1 = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s1.open();
+        assert_eq!(256, s1.get_capacity());
+        assert!(s1.w_str(255, "foobar"));
+        assert_eq!(512, s1.get_capacity());
+        assert_eq!("foobar", s1.r_str(255, 6).unwrap());
+
+        let mut s2 = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s2.open();
+        assert_eq!(256, s2.get_capacity());
+        assert!(s2.w_str(255, "I \u{2661} Rust"));
+        assert_eq!(512, s2.get_capacity());
+        assert_eq!("I \u{2661} Rust", s2.r_str(255, 10).unwrap());
+    }
+
+    #[test]
+    fn w_str_over_capacity_expands_storage_multiple_times() {
+        let mut s1 = MemoryBinaryStorage::new(256, 4, false, 256, 4096).unwrap();
+        s1.open();
+        assert_eq!(256, s1.get_capacity());
+        assert!(s1.w_str(255, "foobar"));
+        assert_eq!(264, s1.get_capacity());
+        assert_eq!("foobar", s1.r_str(255, 6).unwrap());
+
+        let mut s2 = MemoryBinaryStorage::new(256, 4, false, 256, 4096).unwrap();
+        s2.open();
+        assert_eq!(256, s2.get_capacity());
+        assert!(s2.w_str(255, "I \u{2661} Rust"));
+        assert_eq!(268, s2.get_capacity());
+        assert_eq!("I \u{2661} Rust", s2.r_str(255, 10).unwrap());
+    }
+
+    /*
+    #[test]
+    fn w_bytes_over_capacity_expands_storage_multiple_times() {
+        let mut s = MemoryBinaryStorage::new(256, 4, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(256, s.get_capacity());
+        assert!(s.w_bytes(255, &[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6]));
+        assert_eq!(264, s.get_capacity());
+        assert_eq!(&[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6], s.r_bytes(255, 7).unwrap());
     }
     */
+
+    /*
+    #[test]
+    fn w_bytes_over_capacity_expands_storage() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(256, s.get_capacity());
+        assert!(s.w_bytes(255, &[0x0, 0x1]));
+        assert_eq!(512, s.get_capacity());
+        assert_eq!(&[0x0, 0x1], s.r_bytes(255, 2).unwrap());
+    }
+
+    #[test]
+    fn w_bytes_over_capacity_expands_storage_multiple_times() {
+        let mut s = MemoryBinaryStorage::new(256, 4, false, 256, 4096).unwrap();
+        s.open();
+        assert_eq!(256, s.get_capacity());
+        assert!(s.w_bytes(255, &[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6]));
+        assert_eq!(264, s.get_capacity());
+        assert_eq!(&[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6], s.r_bytes(255, 7).unwrap());
+    }
+    */
+
 
     /*
     #[test]
