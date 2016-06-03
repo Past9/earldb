@@ -185,20 +185,15 @@ impl BinaryStorage for MemoryBinaryStorage {
     fn fill(&mut self, start: Option<usize>, end: Option<usize>, val: u8) -> bool {
         if !self.is_open { return false }
 
-        let start_offset = match start {
-            Some(s) => s,
-            None => 0
-        };
+        let start_offset = match start { Some(s) => s, None => 0 };
 
         if start_offset >= self.capacity { return false }
+        if self.use_txn_boundary && start_offset < self.txn_boundary { return false }
 
-        let end_offset = match end {
-            Some(e) => e,
-            None => self.capacity
-        };
+        let end_offset = match end { Some(e) => e, None => self.capacity };
 
         if end_offset <= start_offset { return false }
-        if end_offset >= self.capacity { return false }
+        if end_offset > self.capacity { return false }
 
         unsafe { ptr::write_bytes::<u8>(self.ptr_mut(start_offset), val, end_offset - start_offset) }
 
@@ -223,15 +218,14 @@ impl BinaryStorage for MemoryBinaryStorage {
         if end_offset <= start_offset { return false }
         if end_offset > self.capacity { return false }
 
-        match self.r_bytes(start_offset, end_offset - start_offset) {
-            Some(d) => {
-                for b in d {
-                    if *b != val { return false }
-                }
-                true
-            },
-            None => false
+        let data = unsafe {
+            slice::from_raw_parts::<u8>(self.ptr(start_offset), end_offset - start_offset)
+        };
+
+        for b in data {
+            if *b != val { return false }
         }
+        true
     }
 
 
@@ -1756,458 +1750,128 @@ mod tests {
         assert!(s.r_str(256, 2).is_none());
     }
 
-    /*
+    // fill() tests
     #[test]
-    fn w_bytes_over_capacity_expands_storage_multiple_times() {
-        let mut s = MemoryBinaryStorage::new(256, 4, false, 256, 4096).unwrap();
+    fn fill_returns_false_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        assert!(!s.fill(None, None, 0x1));
+    }
+
+    #[test]
+    fn fill_does_not_write_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.fill(None, None, 0x1);
         s.open();
+        assert!(s.assert_filled(None, None, 0x0));
+    }
+
+    #[test]
+    fn fill_returns_true_when_open() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.fill(None, None, 0x1));
+    }
+
+    #[test]
+    fn fill_repeats_byte_in_storage_range() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.fill(Some(10), Some(20), 0x1));
+        assert!(s.assert_filled(Some(0), Some(10), 0x0));
+        assert!(s.assert_filled(Some(10), Some(20), 0x1));
+        assert!(s.assert_filled(Some(20), None, 0x0));
+    }
+
+    #[test]
+    fn fill_starts_from_beginning_when_start_offset_is_none() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.fill(None, Some(20), 0x1));
+        assert!(s.assert_filled(Some(0), Some(20), 0x1));
+        assert!(s.assert_filled(Some(20), None, 0x0));
+    }
+
+    #[test]
+    fn fill_goes_to_end_when_end_offset_is_none() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(s.fill(Some(10), None, 0x1));
+        assert!(s.assert_filled(None, Some(10), 0x0));
+        assert!(s.assert_filled(Some(10), None, 0x1));
+    }
+
+    #[test]
+    fn fill_returns_false_when_end_offset_is_before_start_offset() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(!s.fill(Some(20), Some(10), 0x1));
+    }
+
+    #[test]
+    fn fill_does_not_write_when_end_offset_is_before_start_offset() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(20), Some(10), 0x1);
+        assert!(s.assert_filled(None, None, 0x0));
+    }
+
+    #[test]
+    fn fill_returns_false_when_before_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(10);
+        assert!(!s.fill(Some(9), None, 0x1));
+    }
+
+    #[test]
+    fn fill_does_not_write_when_before_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(10);
+        s.fill(Some(9), None, 0x1);
+        assert!(s.assert_filled(None, None, 0x0));
+    }
+
+    #[test]
+    fn fill_returns_true_when_after_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(10);
+        assert!(s.fill(Some(10), None, 0x1));
+    }
+
+    #[test]
+    fn fill_writes_when_after_txn_boundary() {
+        let mut s = MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap();
+        s.open();
+        s.set_txn_boundary(10);
+        s.fill(Some(10), None, 0x1);
+        assert!(s.assert_filled(None, Some(10), 0x0));
+        assert!(s.assert_filled(Some(10), None, 0x1));
+    }
+
+    #[test]
+    fn fill_returns_false_when_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        assert!(!s.fill(Some(9), Some(257), 0x1));
+    }
+
+    #[test]
+    fn fill_does_not_write_when_past_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(9), Some(257), 0x1);
+        assert!(s.assert_filled(None, None, 0x0));
+    }
+
+    #[test]
+    fn fill_does_not_expand_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
+        s.open();
+        s.fill(Some(9), Some(257), 0x1);
         assert_eq!(256, s.get_capacity());
-        assert!(s.w_bytes(255, &[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6]));
-        assert_eq!(264, s.get_capacity());
-        assert_eq!(&[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6], s.r_bytes(255, 7).unwrap());
     }
-    */
-
-    /*
-    #[test]
-    fn w_bytes_over_capacity_expands_storage() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert_eq!(256, s.get_capacity());
-        assert!(s.w_bytes(255, &[0x0, 0x1]));
-        assert_eq!(512, s.get_capacity());
-        assert_eq!(&[0x0, 0x1], s.r_bytes(255, 2).unwrap());
-    }
-
-    #[test]
-    fn w_bytes_over_capacity_expands_storage_multiple_times() {
-        let mut s = MemoryBinaryStorage::new(256, 4, false, 256, 4096).unwrap();
-        s.open();
-        assert_eq!(256, s.get_capacity());
-        assert!(s.w_bytes(255, &[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6]));
-        assert_eq!(264, s.get_capacity());
-        assert_eq!(&[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6], s.r_bytes(255, 7).unwrap());
-    }
-    */
-
-
-    /*
-    #[test]
-    fn capacity_returns_0_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(0, s.get_capacity());
-    }
-
-    #[test]
-    fn get_expand_size_returns_expand_size_when_open_or_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap();
-        assert_eq!(512, s.get_expand_size());
-        s.open();
-        assert_eq!(512, s.get_expand_size());
-    }
-
-    #[test]
-    fn get_use_txn_boundary_returns_value_when_open_or_closed() {
-        let mut s1 = MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap();
-        assert!(!s1.get_use_txn_boundary());
-        s1.open();
-        assert!(!s1.get_use_txn_boundary());
-        let mut s2 = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        assert!(s2.get_use_txn_boundary());
-        s2.open();
-        assert!(s2.get_use_txn_boundary());
-    }
-
-    #[test]
-    fn get_align_returns_align_when_open_or_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap();
-        assert_eq!(1024, s.get_align());
-        s.open();
-        assert_eq!(1024, s.get_align());
-    }
-
-    #[test]
-    fn get_txn_boundary_returns_0_when_new_and_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap();
-        assert_eq!(0, s.get_txn_boundary());
-    }
-
-    #[test]
-    fn get_txn_boundary_returns_0_when_new_and_open() {
-        let mut s = MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap();
-        s.open();
-        assert_eq!(0, s.get_txn_boundary());
-    }
-
-
-    #[test]
-    fn w_i16_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_i16(0, 8));
-    }
-
-    #[test]
-    fn w_i32_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_i32(0, 8));
-    }
-
-    #[test]
-    fn w_i64_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_i64(0, 8));
-    }
-
-    #[test]
-    fn w_u8_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_u8(0, 8));
-    }
-
-    #[test]
-    fn w_u16_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_u16(0, 8));
-    }
-
-    #[test]
-    fn w_u32_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_u32(0, 8));
-    }
-
-    #[test]
-    fn w_u64_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_u64(0, 8));
-    }
-
-    #[test]
-    fn w_f32_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_f32(0, 0.8));
-    }
-
-    #[test]
-    fn w_f64_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_f64(0, 0.8));
-    }
-
-    #[test]
-    fn w_bool_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_bool(0, true));
-    }
-
-    #[test]
-    fn w_bytes_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_bytes(0, &[0, 1, 2, 3]));
-    }
-
-    #[test]
-    fn w_str_returns_false_when_closed() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert!(!s.w_str(0, "foo"));
-    }
-
-    #[test]
-    fn r_i8_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_i8(0));
-    }
-
-    #[test]
-    fn r_i16_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_i16(0));
-    }
-
-    #[test]
-    fn r_i32_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_i32(0));
-    }
-
-    #[test]
-    fn r_i64_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_i64(0));
-    }
-
-    #[test]
-    fn r_u8_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_u8(0));
-    }
-
-    #[test]
-    fn r_u16_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_u16(0));
-    }
-
-    #[test]
-    fn r_u32_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_u32(0));
-    }
-
-    #[test]
-    fn r_u64_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_u64(0));
-    }
-
-    #[test]
-    fn r_f32_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_f32(0));
-    }
-
-    #[test]
-    fn r_f64_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_f64(0));
-    }
-
-    #[test]
-    fn r_bool_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_bool(0));
-    }
-
-    #[test]
-    fn r_bytes_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_bytes(0, 8));
-    }
-
-    #[test]
-    fn r_str_returns_none_when_closed() {
-        let s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        assert_eq!(None, s.r_str(0, 8));
-    }
-
-    #[test]
-    fn w_i16_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_i16(0, 8));
-    }
-
-    #[test]
-    fn w_i32_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_i32(0, 8));
-    }
-
-    #[test]
-    fn w_i64_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_i64(0, 8));
-    }
-
-    #[test]
-    fn w_u8_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_u8(0, 8));
-    }
-
-    #[test]
-    fn w_u16_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_u16(0, 8));
-    }
-
-    #[test]
-    fn w_u32_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_u32(0, 8));
-    }
-
-    #[test]
-    fn w_u64_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_u64(0, 8));
-    }
-
-    #[test]
-    fn w_f32_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_f32(0, 0.8));
-    }
-
-    #[test]
-    fn w_f64_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_f64(0, 0.8));
-    }
-
-    #[test]
-    fn w_bool_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_bool(0, true));
-    }
-
-    #[test]
-    fn w_bytes_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_bytes(0, &[0, 1, 2, 3]));
-    }
-
-    #[test]
-    fn w_str_returns_true_when_open() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        assert!(s.w_str(0, "foo"));
-    }
-
-    #[test]
-    fn r_i8_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_i8(0, i8::max_value());
-        assert_eq!(i8::max_value(), s.r_i8(0).unwrap());
-        s.w_i8(mem::size_of::<i8>(), i8::min_value());
-        assert_eq!(i8::min_value(), s.r_i8(mem::size_of::<i8>()).unwrap());
-    }
-
-    #[test]
-    fn r_i16_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_i16(0, i16::max_value());
-        assert_eq!(i16::max_value(), s.r_i16(0).unwrap());
-        s.w_i16(mem::size_of::<i16>(), i16::min_value());
-        assert_eq!(i16::min_value(), s.r_i16(mem::size_of::<i16>()).unwrap());
-    }
-
-    #[test]
-    fn r_i32_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_i32(0, i32::max_value());
-        assert_eq!(i32::max_value(), s.r_i32(0).unwrap());
-        s.w_i32(mem::size_of::<i32>(), i32::min_value());
-        assert_eq!(i32::min_value(), s.r_i32(mem::size_of::<i32>()).unwrap());
-    }
-
-    #[test]
-    fn r_i64_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_i64(0, i64::max_value());
-        assert_eq!(i64::max_value(), s.r_i64(0).unwrap());
-        s.w_i64(mem::size_of::<i64>(), i64::min_value());
-        assert_eq!(i64::min_value(), s.r_i64(mem::size_of::<i64>()).unwrap());
-    }
-
-    #[test]
-    fn r_u8_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_u8(0, u8::max_value());
-        assert_eq!(u8::max_value(), s.r_u8(0).unwrap());
-        s.w_u8(mem::size_of::<u8>(), u8::min_value());
-        assert_eq!(u8::min_value(), s.r_u8(mem::size_of::<u8>()).unwrap());
-    }
-
-    #[test]
-    fn r_u16_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_u16(0, u16::max_value());
-        assert_eq!(u16::max_value(), s.r_u16(0).unwrap());
-        s.w_u16(mem::size_of::<u16>(), u16::min_value());
-        assert_eq!(u16::min_value(), s.r_u16(mem::size_of::<u16>()).unwrap());
-    }
-
-    #[test]
-    fn r_u32_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_u32(0, u32::max_value());
-        assert_eq!(u32::max_value(), s.r_u32(0).unwrap());
-        s.w_u32(mem::size_of::<u32>(), u32::min_value());
-        assert_eq!(u32::min_value(), s.r_u32(mem::size_of::<u32>()).unwrap());
-    }
-
-    #[test]
-    fn r_u64_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_u64(0, u64::max_value());
-        assert_eq!(u64::max_value(), s.r_u64(0).unwrap());
-        s.w_u64(mem::size_of::<u64>(), u64::min_value());
-        assert_eq!(u64::min_value(), s.r_u64(mem::size_of::<u64>()).unwrap());
-    }
-
-    #[test]
-    fn r_f32_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_f32(0, 12345.6789);
-        assert_eq!(12345.6789, s.r_f32(0).unwrap());
-        s.w_f32(mem::size_of::<f32>(), -0.0004321);
-        assert_eq!(-0.0004321, s.r_f32(mem::size_of::<f32>()).unwrap());
-    }
-
-    #[test]
-    fn r_f64_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_f64(0, 12345.6789);
-        assert_eq!(12345.6789, s.r_f64(0).unwrap());
-        s.w_f64(mem::size_of::<f64>(), -0.0004321);
-        assert_eq!(-0.0004321, s.r_f64(mem::size_of::<f64>()).unwrap());
-    }
-
-    #[test]
-    fn r_bool_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_bool(0, true);
-        assert_eq!(true, s.r_bool(0).unwrap());
-        s.w_bool(mem::size_of::<bool>(), false);
-        assert_eq!(false, s.r_bool(mem::size_of::<bool>()).unwrap());
-    }
-
-    #[test]
-    fn r_bytes_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_bytes(0, &[0x0, 0x1, 0x2, 0x3]);
-        assert_eq!(&[0x0, 0x1, 0x2, 0x3], s.r_bytes(0, 4).unwrap());
-        s.w_bytes(4, &[0x4, 0x5, 0x6, 0x7]);
-        assert_eq!(&[0x4, 0x5, 0x6, 0x7], s.r_bytes(4, 4).unwrap());
-    }
-
-    #[test]
-    fn r_str_reads_data() {
-        let mut s = MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap();
-        s.open();
-        s.w_str(0, "foobar");
-        assert_eq!("foobar", s.r_str(0, 6).unwrap());
-        s.w_str(6, "bazquux");
-        assert_eq!("bazquux", s.r_str(6, 7).unwrap());
-    }
-
-    */
-
-
-    
 
 
 
