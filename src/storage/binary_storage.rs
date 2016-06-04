@@ -54,10 +54,10 @@ pub trait BinaryStorage {
     fn set_txn_boundary(&mut self, offset: usize) -> bool;
 
     fn get_expand_size(&self) -> usize;
-    fn set_expand_size(&mut self, expand_size: usize);
+    fn set_expand_size(&mut self, expand_size: usize) -> bool ;
 
     fn get_align(&self) -> usize;
-    fn set_align(&mut self, align: usize);
+    fn set_align(&mut self, align: usize) -> bool ;
 
     fn get_capacity(&self) -> usize;
 

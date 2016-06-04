@@ -29,7 +29,7 @@ impl MemoryBinaryStorage {
         max_page_size: usize
     ) -> Option<MemoryBinaryStorage> {
 
-        if !MemoryBinaryStorage::check_initial_mem_params(
+        if !MemoryBinaryStorage::check_mem_params(
             align,
             expand_size,
             initial_capacity,
@@ -81,7 +81,7 @@ impl MemoryBinaryStorage {
         return (n != 0) && (n & (n - 1)) == 0;
     }
 
-    fn check_initial_mem_params(
+    fn check_mem_params(
         align: usize,
         expand_size: usize,
         initial_capacity: usize,
@@ -101,10 +101,6 @@ impl MemoryBinaryStorage {
         if align > max_page_size { return false }
         // If all checks pass, return true
         true
-    }
-
-    fn check_expand_size(expand_size: usize) -> bool {
-        unimplemented!() 
     }
 
 
@@ -261,28 +257,49 @@ impl BinaryStorage for MemoryBinaryStorage {
         self.expand_size
     }
 
-    fn set_expand_size(&mut self, expand_size: usize) {
-        // TODO: check memory params
-        unimplemented!();
+    fn set_expand_size(&mut self, expand_size: usize) -> bool {
+        if !MemoryBinaryStorage::check_mem_params(
+            self.align,
+            expand_size,
+            self.capacity,
+            self.max_page_size
+        ) { return false }
+
+        self.expand_size = expand_size;
+        true
     }
 
     fn get_align(&self) -> usize {
         self.align
     }
 
-    fn set_align(&mut self, align: usize) {
-        // TODO: check memory params
-        unimplemented!();
+    fn set_align(&mut self, align: usize) -> bool {
+        if !MemoryBinaryStorage::check_mem_params(
+            align,
+            self.expand_size,
+            self.capacity,
+            self.max_page_size
+        ) { return false }
+
+        self.align = align;
+        true
     }
 
 
     fn expand(&mut self, min_capacity: usize) -> bool {
+        if !self.is_open { return false }
+
         // Determine the new size of the journal in multiples of expand_size
-        let expand_increments = (min_capacity as f32 / self.expand_size as f32).ceil() as usize;
+        let expand_increments = (min_capacity as f64 / self.expand_size as f64).ceil() as usize;
         let new_capacity = match expand_increments.checked_mul(self.expand_size) {
             Some(x) => x,
             None => return false
         };
+
+        // We don't want to reallocate (or even reduce the capacity) if we already have enough,
+        // so just do nothing and return true if we already have enough room
+        if new_capacity < self.capacity { return true }
+
 
         // Allocate new memory
         let ptr = unsafe {
@@ -2064,6 +2081,225 @@ mod tests {
         assert_eq!(200, s.get_txn_boundary());
     }
 
+    // get_expand_size() and set_expand_size() tests
+    #[test]
+    fn get_expand_size_returns_initial_expand_size() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert_eq!(512, s.get_expand_size());
+    }
+
+    #[test]
+    fn set_expand_size_returns_false_when_expand_size_is_zero() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(!s.set_expand_size(0));
+    }
+
+    #[test]
+    fn set_expand_size_does_not_change_expand_size_when_expand_size_is_zero() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_expand_size(0);
+        assert_eq!(512, s.get_expand_size());
+    }
+
+    #[test]
+    fn set_expand_size_returns_false_when_expand_size_is_not_power_of_2() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(!s.set_expand_size(513));
+    }
+
+    #[test]
+    fn set_expand_size_does_not_change_expand_size_when_expand_size_is_not_power_of_2() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_expand_size(513);
+        assert_eq!(512, s.get_expand_size());
+    }
+
+    #[test]
+    fn set_expand_size_returns_true_when_checks_pass() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(s.set_expand_size(1024));
+    }
+
+    #[test]
+    fn set_expand_size_changes_expand_size_when_checks_pass() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_expand_size(1024);
+        assert_eq!(1024, s.get_expand_size());
+    }
+
+    #[test]
+    fn capacity_increases_to_increments_of_last_set_expand_size() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.w_u8(256, 0x1);
+        assert_eq!(512, s.get_capacity());
+        s.set_expand_size(8);
+        s.w_u8(512, 0x1);
+        assert_eq!(520, s.get_capacity());
+    }
+
+    // get_align() and set_align() tests
+    #[test]
+    fn get_align_returns_initial_align() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert_eq!(1024, s.get_align());
+    }
+
+    #[test]
+    fn set_align_returns_false_when_align_is_zero() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(!s.set_align(0));
+    }
+
+    #[test]
+    fn set_align_does_not_change_align_when_align_is_zero() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_align(0);
+        assert_eq!(1024, s.get_align());
+    }
+
+    #[test]
+    fn set_align_returns_false_when_align_is_not_power_of_2() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(!s.set_align(1025));
+    }
+
+    #[test]
+    fn set_align_does_not_change_align_when_align_is_not_power_of_2() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_align(1025);
+        assert_eq!(1024, s.get_align());
+    }
+
+    #[test]
+    fn set_align_returns_true_when_checks_pass() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(s.set_align(2048));
+    }
+
+    #[test]
+    fn set_align_changes_align_when_checks_pass() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_align(2048);
+        assert_eq!(2048, s.get_align());
+    }
+
+    // get_capacity() tests
+    #[test]
+    fn get_capacity_returns_0_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert_eq!(0, s.get_capacity());
+        s.open();
+        s.close();
+        assert_eq!(0, s.get_capacity());
+    }
+
+    #[test]
+    fn get_capacity_returns_initial_capacity_when_open() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        assert_eq!(256, s.get_capacity());
+    }
+
+    #[test]
+    fn get_capacity_returns_new_capacity_after_expansion() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.w_u8(256, 0x1);
+        assert_eq!(512, s.get_capacity());
+    }
+
+    // get_max_page_size() tests
+    #[test]
+    fn get_max_page_size_returns_max_page_size() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert_eq!(4096, s.get_max_page_size());
+    }
+
+    // expand() tests
+    #[test]
+    fn expand_returns_false_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(!s.expand(10000));
+    }
+
+    #[test]
+    fn expand_does_not_change_capacity_when_closed() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.expand(10000);
+        s.open();
+        assert_eq!(256, s.get_capacity());
+    }
+
+    #[test]
+    fn expand_returns_true_when_already_has_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.set_expand_size(16);
+        assert!(s.expand(50));
+    }
+
+    #[test]
+    fn expand_does_not_change_capacity_when_already_has_capacity() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.set_expand_size(16);
+        s.expand(50);
+        assert_eq!(256, s.get_capacity());
+    }
+
+    #[test]
+    fn expand_returns_false_when_allocation_arithmetic_overflows() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        assert!(!s.expand(usize::max_value()));
+    }
+
+    #[test]
+    fn expand_does_not_change_capacity_when_allocation_arithmetic_overflows() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.expand(usize::max_value());
+        assert_eq!(256, s.get_capacity());
+    }
+
+    #[test]
+    fn expand_returns_false_when_allocation_fails() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        assert!(!s.expand((usize::max_value() - 1024) as usize));
+    }
+
+    #[test]
+    fn expand_does_not_change_capacity_when_allocation_fails() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.expand((usize::max_value() - 1024) as usize);
+        assert_eq!(256, s.get_capacity());
+    }
+
+    #[test]
+    fn expand_returns_true_when_successful() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        assert!(s.expand(300));
+    }
+
+    #[test]
+    fn expand_changes_capacity_by_expand_size_when_successful() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.expand(300);
+        assert_eq!(512, s.get_capacity());
+    }
+
+    #[test]
+    fn expand_changes_capacity_by_multiples_of_expand_size_when_successful() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.open();
+        s.expand(3000);
+        assert_eq!(3072, s.get_capacity());
+    }
 
 
 }
