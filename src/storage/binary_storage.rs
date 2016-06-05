@@ -55,12 +55,7 @@ pub trait BinaryStorage {
     fn get_expand_size(&self) -> usize;
     fn set_expand_size(&mut self, expand_size: usize) -> bool ;
 
-    fn get_align(&self) -> usize;
-    fn set_align(&mut self, align: usize) -> bool ;
-
     fn get_capacity(&self) -> usize;
-
-    fn get_max_page_size(&self) -> usize;
 
     fn expand(&mut self, min_capacity: usize) -> bool;
 

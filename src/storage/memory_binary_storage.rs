@@ -52,6 +52,26 @@ impl MemoryBinaryStorage {
 
     }
 
+    pub fn get_align(&self) -> usize {
+        self.align
+    }
+
+    pub fn set_align(&mut self, align: usize) -> bool {
+        if !MemoryBinaryStorage::check_mem_params(
+            align,
+            self.expand_size,
+            self.capacity,
+            self.max_page_size
+        ) { return false }
+
+        self.align = align;
+        true
+    }
+
+    pub fn get_max_page_size(&self) -> usize {
+        self.max_page_size
+    }
+
     fn ptr<T>(&self, offset: usize) -> *const T {
         (self.origin as usize + offset) as *const T
     }
@@ -269,22 +289,6 @@ impl BinaryStorage for MemoryBinaryStorage {
         true
     }
 
-    fn get_align(&self) -> usize {
-        self.align
-    }
-
-    fn set_align(&mut self, align: usize) -> bool {
-        if !MemoryBinaryStorage::check_mem_params(
-            align,
-            self.expand_size,
-            self.capacity,
-            self.max_page_size
-        ) { return false }
-
-        self.align = align;
-        true
-    }
-
 
     fn expand(&mut self, min_capacity: usize) -> bool {
         if !self.is_open { return false }
@@ -328,10 +332,6 @@ impl BinaryStorage for MemoryBinaryStorage {
     fn get_capacity(&self) -> usize {
         if !self.is_open { return 0 }
         self.capacity
-    }
-
-    fn get_max_page_size(&self) -> usize {
-        self.max_page_size
     }
 
     fn is_open(&self) -> bool {
