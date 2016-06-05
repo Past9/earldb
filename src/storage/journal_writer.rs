@@ -307,6 +307,7 @@ impl Drop for JournalWriter {
 }
 
 
+/*
 #[cfg(test)]
 mod tests {
 
@@ -652,3 +653,4 @@ mod tests {
 
 
 }
+*/

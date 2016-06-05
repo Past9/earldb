@@ -164,6 +164,7 @@ impl Drop for JournalReader {
 }
 
 
+/*
 #[cfg(test)]
 mod tests {
 
@@ -597,3 +598,4 @@ mod tests {
 
 
 }
+*/
