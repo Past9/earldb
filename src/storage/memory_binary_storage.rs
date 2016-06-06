@@ -6,6 +6,7 @@ extern crate core;
 use std::str;
 use alloc::heap;
 use std::{mem, ptr, slice};
+use storage::util;
 use storage::binary_storage::BinaryStorage;
 
 
@@ -37,6 +38,9 @@ impl MemoryBinaryStorage {
         ) { return None };
 
         let origin = unsafe { heap::allocate(initial_capacity, align) as *mut u8 };
+
+        if origin.is_null() { return None }
+
         unsafe { ptr::write_bytes::<u8>(origin, 0x0, initial_capacity) };
 
         Some(MemoryBinaryStorage {
@@ -97,10 +101,6 @@ impl MemoryBinaryStorage {
         unsafe { Some(ptr::read(self.ptr(offset))) }
     }
 
-    fn is_power_of_two(n: usize) -> bool {
-        return (n != 0) && (n & (n - 1)) == 0;
-    }
-
     fn check_mem_params(
         align: usize,
         expand_size: usize,
@@ -110,13 +110,13 @@ impl MemoryBinaryStorage {
         // Initial capacity and expansion size must be greater than zero
         if initial_capacity < 1 || expand_size < 1 { return false }
         // Max page size must be a power of 2 
-        if !MemoryBinaryStorage::is_power_of_two(max_page_size) { return false }
+        if !util::is_power_of_two(max_page_size) { return false }
         // Alignment must be a power of 2
-        if !MemoryBinaryStorage::is_power_of_two(align) { return false }
+        if !util::is_power_of_two(align) { return false }
         // Initial capacity must be a power of 2
-        if !MemoryBinaryStorage::is_power_of_two(initial_capacity) { return false }
+        if !util::is_power_of_two(initial_capacity) { return false }
         // Expansion size must be a power of 2
-        if !MemoryBinaryStorage::is_power_of_two(expand_size) { return false }
+        if !util::is_power_of_two(expand_size) { return false }
         // Alignment must be no larger than max page size
         if align > max_page_size { return false }
         // If all checks pass, return true
