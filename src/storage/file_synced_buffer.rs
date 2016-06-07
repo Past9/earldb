@@ -3,11 +3,14 @@
 extern crate alloc;
 extern crate core;
 
+use std::fs::File;
+use std::io::{Seek, SeekFrom};
 use std::str;
 use alloc::heap;
 use std::{mem, ptr, slice};
 use std::collections::HashMap;
 use storage::util;
+
 
 
 struct FilePage {
@@ -48,8 +51,8 @@ impl FilePage {
         align: usize,
         max_size: u32,
     ) -> bool {
-        // max_size and alignment must be greater than zero
-        if max_size < 1 || align < 1 { return false }
+        // alignment must be greater than zero
+        if align < 1 { return false }
         // Max size must be a power of 2 
         if !util::is_power_of_two(max_size as usize) { return false }
         // Alignment must be a power of 2
@@ -65,7 +68,7 @@ impl FilePage {
         dest.clone_from_slice(data);
     }
 
-    pub fn read(&mut self, offset: u32, len: u32) -> &[u8] {
+    pub fn read(&self, offset: u32, len: u32) -> &[u8] {
         unsafe { slice::from_raw_parts(self.ptr(offset), len as usize) }
     }
 
@@ -85,19 +88,22 @@ impl FilePage {
 
 
 pub struct FileSyncedBuffer {
+    file: File,
     page_size: u32,
     max_pages: u16,
     page_mem_align: usize,
-    pages: HashMap<u16, FilePage>
+    pages: HashMap<u64, FilePage>
 }
 impl FileSyncedBuffer {
 
     pub fn new(
+        file: File,
         page_size: u32,
         max_pages: u16,
         page_mem_align: usize
     ) -> FileSyncedBuffer {
         FileSyncedBuffer {
+            file: file,
             page_size: page_size,
             max_pages: max_pages,
             page_mem_align: page_mem_align,
@@ -105,26 +111,58 @@ impl FileSyncedBuffer {
         }
     }
 
-    fn calc_page_range(&self, offset: u64, len: usize) -> (u64, u64) {
-        let mut start = offset / self.page_size as u64; 
-        let mut end = (offset + len as u64) / self.page_size as u64;
+    fn calc_page_range(&self, offset: u64, length: usize) -> (u64, u64) {
+        let page_size = self.page_size as u64;
+        let len = length as u64;
+        let mut start = offset / page_size; 
+        let mut end = (offset + len) / page_size;
         (start as u64, end as u64)
     }
 
-    fn calc_page_section(&self, page_index: u64, offset: u64, len: usize) -> (u32, u32) {
-        let offset_in_page = (page_index * self.page_size as u64) % offset;
+    fn calc_page_section(&self, page_index: u64, offset: u64, length: usize) -> (u32, u32) {
+        let page_size = self.page_size as u64;
+        let len = length as u64;
+        let offset_in_page = (page_index * page_size) % offset;
         let mut len_in_page: u64 = 0;
-        if len as u64 + offset_in_page > self.page_size as u64 {
-            len_in_page = self.page_size as u64 - offset_in_page;
+        if len + offset_in_page > page_size{
+            len_in_page = page_size - offset_in_page;
         } else {
-            len_in_page = len as u64 - offset_in_page; 
+            len_in_page = len - offset_in_page; 
         }
         (offset_in_page as u32, len_in_page as u32)
     }
 
-    fn get_page(&mut self, index: u64) -> Option<FilePage> {
-        unimplemented!();
+    fn get_page(&mut self, index: u64) -> Option<&FilePage> {
+
+        match self.pages.get(&index) {
+            Some(p) => return Some(p),
+            None => ()
+        };
+
+        let seekPos = index * self.page_size as u64;
+
+        match self.file.seek(SeekFrom::Start(seekPos)) {
+            Ok(s) => if s != seekPos { return None },
+            Err(_) => return None
+        };
+
+
+
+        None
+
+        
+
     }
+
+    /*
+    fn get_page_mut(&mut self, index: u64) -> Option<&mut FilePage> {
+        match self.pages.get_mut(&index) {
+            Some(p) => Some(p),
+            None => {
+            }
+        }
+    }
+    */
 
     pub fn read(&mut self, offset: u64, len: usize) -> &[u8] {
         let (start, end) = self.calc_page_range(offset, len);
@@ -168,27 +206,20 @@ impl FileSyncedBuffer {
     }
 
     pub fn get_page_size(&self) -> u32 {
-        unimplemented!();
-    }
-
-    pub fn set_page_size(&mut self, size: u32) {
-        unimplemented!();
+        self.page_size
     }
 
     pub fn get_max_pages(&self) -> u16 {
-        unimplemented!();
+        self.max_pages
     }
 
     pub fn set_max_pages(&mut self, pages: u16) {
-        unimplemented!();
+        self.max_pages = pages;
+        // TODO: Remove old pages
     }
 
     pub fn get_num_current_pages(&self) -> u16 {
         unimplemented!();
-    }
-
-    pub fn set_page_mem_align(&mut self, align: usize) {
-        self.page_mem_align = align
     }
 
     pub fn get_page_mem_align(&self) -> usize {
