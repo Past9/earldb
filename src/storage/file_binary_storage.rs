@@ -1,4 +1,5 @@
 use storage::binary_storage::BinaryStorage;
+use error::{ Error };
 
 
 pub struct FileBinaryStorage {
@@ -101,7 +102,7 @@ impl BinaryStorage for FileBinaryStorage {
         unimplemented!();
     }
 
-    fn set_expand_size(&mut self, expand_size: usize) -> bool {
+    fn set_expand_size(&mut self, expand_size: usize) -> Result<(), Error> {
         unimplemented!();
     }
 

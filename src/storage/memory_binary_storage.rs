@@ -7,9 +7,13 @@ use std::str;
 use alloc::heap;
 use std::{mem, ptr, slice};
 use storage::util;
+use error::{ Error, MemoryError };
+use storage::binary_storage;
 use storage::binary_storage::BinaryStorage;
 
 
+
+#[derive(Debug)]
 pub struct MemoryBinaryStorage {
     origin: *const u8,
     is_open: bool,
@@ -28,22 +32,24 @@ impl MemoryBinaryStorage {
         use_txn_boundary: bool,
         align: usize,
         max_page_size: usize
-    ) -> Option<MemoryBinaryStorage> {
+    ) -> Result<MemoryBinaryStorage, Error> {
 
-        if !MemoryBinaryStorage::check_mem_params(
+        try!(MemoryBinaryStorage::check_mem_params(
             align,
             expand_size,
             initial_capacity,
             max_page_size
-        ) { return None };
+        )); 
 
         let origin = unsafe { heap::allocate(initial_capacity, align) as *mut u8 };
 
-        if origin.is_null() { return None }
+        if origin.is_null() { 
+            return Err(Error::Memory(MemoryError::new(binary_storage::ERR_MEM_ALLOC)));
+        }
 
         unsafe { ptr::write_bytes::<u8>(origin, 0x0, initial_capacity) };
 
-        Some(MemoryBinaryStorage {
+        Ok(MemoryBinaryStorage {
             origin: origin as *const u8,
             is_open: false,
             capacity: initial_capacity,
@@ -60,16 +66,16 @@ impl MemoryBinaryStorage {
         self.align
     }
 
-    pub fn set_align(&mut self, align: usize) -> bool {
-        if !MemoryBinaryStorage::check_mem_params(
+    pub fn set_align(&mut self, align: usize) -> Result<(), Error> {
+        try!(MemoryBinaryStorage::check_mem_params(
             align,
             self.expand_size,
             self.capacity,
             self.max_page_size
-        ) { return false }
+        ));
 
         self.align = align;
-        true
+        Ok(())
     }
 
     pub fn get_max_page_size(&self) -> usize {
@@ -106,21 +112,41 @@ impl MemoryBinaryStorage {
         expand_size: usize,
         initial_capacity: usize,
         max_page_size: usize
-    ) -> bool {
-        // Initial capacity and expansion size must be greater than zero
-        if initial_capacity < 1 || expand_size < 1 { return false }
+    ) -> Result<(), MemoryError> {
+        // Expansion size must be greater than zero
+        if expand_size < 1 { 
+            return Err(MemoryError::new(binary_storage::ERR_EXPAND_SIZE_TOO_SMALL)); 
+        }
+        // Initial capacity must be greater than zero
+        if initial_capacity < 1 { 
+            return Err(MemoryError::new(binary_storage::ERR_INITIAL_CAP_TOO_SMALL)); 
+        }
+        // Alignment must be greater than zero
+        if align < 1 { 
+            return Err(MemoryError::new(binary_storage::ERR_ALIGN_TOO_SMALL)); 
+        }
         // Max page size must be a power of 2 
-        if !util::is_power_of_two(max_page_size) { return false }
+        if !util::is_power_of_two(max_page_size) { 
+            return Err(MemoryError::new(binary_storage::ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2)); 
+        }
         // Alignment must be a power of 2
-        if !util::is_power_of_two(align) { return false }
+        if !util::is_power_of_two(align) { 
+            return Err(MemoryError::new(binary_storage::ERR_ALIGN_NOT_POWER_OF_2)); 
+        }
         // Initial capacity must be a power of 2
-        if !util::is_power_of_two(initial_capacity) { return false }
+        if !util::is_power_of_two(initial_capacity) { 
+            return Err(MemoryError::new(binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2)); 
+        }
         // Expansion size must be a power of 2
-        if !util::is_power_of_two(expand_size) { return false }
+        if !util::is_power_of_two(expand_size) { 
+            return Err(MemoryError::new(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2)); 
+        }
         // Alignment must be no larger than max page size
-        if align > max_page_size { return false }
+        if align > max_page_size { 
+            return Err(MemoryError::new(binary_storage::ERR_ALIGN_LARGER_THAN_PAGE_SIZE)); 
+        }
         // If all checks pass, return true
-        true
+        Ok(())
     }
 
 
@@ -277,16 +303,16 @@ impl BinaryStorage for MemoryBinaryStorage {
         self.expand_size
     }
 
-    fn set_expand_size(&mut self, expand_size: usize) -> bool {
-        if !MemoryBinaryStorage::check_mem_params(
+    fn set_expand_size(&mut self, expand_size: usize) -> Result<(), Error> {
+        try!(MemoryBinaryStorage::check_mem_params(
             self.align,
             expand_size,
             self.capacity,
             self.max_page_size
-        ) { return false }
+        ));
 
         self.expand_size = expand_size;
-        true
+        Ok(())
     }
 
 
@@ -346,7 +372,9 @@ impl BinaryStorage for MemoryBinaryStorage {
 mod memory_binary_storage_tests {
 
     use std::{mem, str};
+    use std::error::Error;
 
+    use storage::binary_storage;
     use storage::binary_storage::tests;
     use storage::binary_storage::BinaryStorage;
     use storage::memory_binary_storage::MemoryBinaryStorage;
@@ -404,71 +432,103 @@ mod memory_binary_storage_tests {
     #[test]
     fn new_requires_initial_capacity_greater_than_0() {
         let s = MemoryBinaryStorage::new(0, 512, false, 1024, 4096);
-        assert!(s.is_none());
+        assert!(s.is_err());
+        assert_eq!(binary_storage::ERR_INITIAL_CAP_TOO_SMALL, s.unwrap_err().description());
     }
 
     #[test]
     fn new_requires_expand_size_greater_than_0() {
         let s = MemoryBinaryStorage::new(256, 0, false, 1024, 4096);
-        assert!(s.is_none());
+        assert!(s.is_err());
+        assert_eq!(binary_storage::ERR_EXPAND_SIZE_TOO_SMALL, s.unwrap_err().description());
+    }
+
+    #[test]
+    fn new_requires_alignment_greater_than_0() {
+        let s = MemoryBinaryStorage::new(256, 512, false, 0, 4096);
+        assert!(s.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_TOO_SMALL, s.unwrap_err().description());
     }
 
     #[test]
     fn new_requires_max_page_size_is_power_of_2() {
         let s1 = MemoryBinaryStorage::new(256, 512, false, 1024, 2048);
-        assert!(s1.is_some());
+        assert!(s1.is_ok());
+
         let s2 = MemoryBinaryStorage::new(256, 512, false, 1024, 2049);
-        assert!(s2.is_none());
+        assert!(s2.is_err());
+        assert_eq!(binary_storage::ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2, s2.unwrap_err().description());
+
         let s3 = MemoryBinaryStorage::new(256, 512, false, 1024, 3072);
-        assert!(s3.is_none());
+        assert!(s3.is_err());
+        assert_eq!(binary_storage::ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2, s3.unwrap_err().description());
+
         let s4 = MemoryBinaryStorage::new(256, 512, false, 1024, 4096);
-        assert!(s4.is_some());
+        assert!(s4.is_ok());
     }
 
     #[test]
     fn new_requires_alignment_is_power_of_2() {
         let s1 = MemoryBinaryStorage::new(256, 512, false, 1024, 4096);
-        assert!(s1.is_some());
+        assert!(s1.is_ok());
+
         let s2 = MemoryBinaryStorage::new(256, 512, false, 1025, 4096);
-        assert!(s2.is_none());
+        assert!(s2.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_NOT_POWER_OF_2, s2.unwrap_err().description());
+
         let s3 = MemoryBinaryStorage::new(256, 512, false, 1536, 4096);
-        assert!(s3.is_none());
+        assert!(s3.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_NOT_POWER_OF_2, s3.unwrap_err().description());
+
         let s4 = MemoryBinaryStorage::new(256, 512, false, 2048, 4096);
-        assert!(s4.is_some());
+        assert!(s4.is_ok());
     }
 
     #[test]
     fn new_requires_initial_capacity_is_power_of_2() {
         let s1 = MemoryBinaryStorage::new(256, 512, false, 1024, 4096);
-        assert!(s1.is_some());
+        assert!(s1.is_ok());
+
         let s2 = MemoryBinaryStorage::new(257, 512, false, 1024, 4096);
-        assert!(s2.is_none());
+        assert!(s2.is_err());
+        assert_eq!(binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2, s2.unwrap_err().description());
+
         let s3 = MemoryBinaryStorage::new(384, 512, false, 1024, 4096);
-        assert!(s3.is_none());
+        assert!(s3.is_err());
+        assert_eq!(binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2, s3.unwrap_err().description());
+
         let s4 = MemoryBinaryStorage::new(512, 512, false, 1024, 4096);
-        assert!(s4.is_some());
+        assert!(s4.is_ok());
     }
 
     #[test]
     fn new_requires_expand_size_is_power_of_2() {
         let s1 = MemoryBinaryStorage::new(256, 512, false, 1024, 4096);
-        assert!(s1.is_some());
+        assert!(s1.is_ok());
+
         let s2 = MemoryBinaryStorage::new(256, 513, false, 1024, 4096);
-        assert!(s2.is_none());
+        assert!(s2.is_err());
+        assert_eq!(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, s2.unwrap_err().description());
+
         let s3 = MemoryBinaryStorage::new(256, 768, false, 1024, 4096);
-        assert!(s3.is_none());
+        assert!(s3.is_err());
+        assert_eq!(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, s3.unwrap_err().description());
+
         let s4 = MemoryBinaryStorage::new(256, 1024, false, 1024, 4096);
-        assert!(s4.is_some());
+        assert!(s4.is_ok());
     }
 
     #[test]
     fn new_requires_alignment_no_larger_than_max_page_size() {
         let s1 = MemoryBinaryStorage::new(256, 512, false, 512, 1024);
-        assert!(s1.is_some());
+        assert!(s1.is_ok());
+
         let s2 = MemoryBinaryStorage::new(256, 512, false, 1024, 1024);
-        assert!(s2.is_some());
+        assert!(s2.is_ok());
+
         let s3 = MemoryBinaryStorage::new(256, 512, false, 2048, 1024);
-        assert!(s3.is_none());
+        assert!(s3.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_LARGER_THAN_PAGE_SIZE, s3.unwrap_err().description());
     }
 
     #[test]
@@ -1785,8 +1845,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn set_expand_size_returns_false_when_expand_size_is_zero() {
-        tests::set_expand_size_returns_false_when_expand_size_is_zero(
+    fn set_expand_size_returns_err_when_expand_size_is_zero() {
+        tests::set_expand_size_returns_err_when_expand_size_is_zero(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -1799,8 +1859,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn set_expand_size_returns_false_when_expand_size_is_not_power_of_2() {
-        tests::set_expand_size_returns_false_when_expand_size_is_not_power_of_2(
+    fn set_expand_size_returns_err_when_expand_size_is_not_power_of_2() {
+        tests::set_expand_size_returns_err_when_expand_size_is_not_power_of_2(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -1841,9 +1901,11 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn set_align_returns_false_when_align_is_zero() {
+    fn set_align_returns_err_when_align_is_zero() {
         let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        assert!(!s.set_align(0));
+        let res = s.set_align(0);
+        assert!(res.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_TOO_SMALL, res.unwrap_err().description());
     }
 
     #[test]
@@ -1856,7 +1918,9 @@ mod memory_binary_storage_tests {
     #[test]
     fn set_align_returns_false_when_align_is_not_power_of_2() {
         let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        assert!(!s.set_align(1025));
+        let res = s.set_align(1025);
+        assert!(res.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_NOT_POWER_OF_2, res.unwrap_err().description());
     }
 
     #[test]
@@ -1869,7 +1933,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn set_align_returns_true_when_checks_pass() {
         let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        assert!(s.set_align(2048));
+        assert!(s.set_align(2048).is_ok());
     }
 
     #[test]

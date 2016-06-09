@@ -1,3 +1,14 @@
+use error::{ Error };
+
+pub static ERR_MEM_ALLOC: &'static str = "Memory allocation failed";
+pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str = "Expansion size must be greater that zero";
+pub static ERR_INITIAL_CAP_TOO_SMALL: &'static str = "Initial capacity must be greater than zero";
+pub static ERR_ALIGN_TOO_SMALL: &'static str = "Alignment must be greater than zero";
+pub static ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2: &'static str = "Max page size must be a power of 2";
+pub static ERR_ALIGN_NOT_POWER_OF_2: &'static str = "Alignment must be a power of 2";
+pub static ERR_INITIAL_CAP_NOT_POWER_OF_2: &'static str = "Initial capacity must be a power of 2";
+pub static ERR_EXPAND_SIZE_NOT_POWER_OF_2: &'static str = "Expansion size must be a power of 2";
+pub static ERR_ALIGN_LARGER_THAN_PAGE_SIZE: &'static str = "Alignment must be no larger than max page size";
 
 pub trait BinaryStorage {
 
@@ -53,7 +64,7 @@ pub trait BinaryStorage {
     fn set_txn_boundary(&mut self, offset: usize) -> bool;
 
     fn get_expand_size(&self) -> usize;
-    fn set_expand_size(&mut self, expand_size: usize) -> bool ;
+    fn set_expand_size(&mut self, expand_size: usize) -> Result<(), Error>;
 
     fn get_capacity(&self) -> usize;
 
@@ -67,6 +78,8 @@ pub mod tests {
 
     use std::{mem, str};
 
+    use std::error::Error;
+    use storage::binary_storage;
     use storage::binary_storage::BinaryStorage;
 
 
@@ -1326,8 +1339,10 @@ pub mod tests {
         assert_eq!(512, s.get_expand_size());
     }
 
-    pub fn set_expand_size_returns_false_when_expand_size_is_zero<T: BinaryStorage>(mut s: T) {
-        assert!(!s.set_expand_size(0));
+    pub fn set_expand_size_returns_err_when_expand_size_is_zero<T: BinaryStorage>(mut s: T) {
+        let res = s.set_expand_size(0);
+        assert!(res.is_err());
+        assert_eq!(binary_storage::ERR_EXPAND_SIZE_TOO_SMALL, res.unwrap_err().description());
     }
 
     pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_zero<T: BinaryStorage>(mut s: T) {
@@ -1335,8 +1350,10 @@ pub mod tests {
         assert_eq!(512, s.get_expand_size());
     }
 
-    pub fn set_expand_size_returns_false_when_expand_size_is_not_power_of_2<T: BinaryStorage>(mut s: T) {
-        assert!(!s.set_expand_size(513));
+    pub fn set_expand_size_returns_err_when_expand_size_is_not_power_of_2<T: BinaryStorage>(mut s: T) {
+        let res = s.set_expand_size(513);
+        assert!(res.is_err());
+        assert_eq!(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, res.unwrap_err().description());
     }
 
     pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_not_power_of_2<T: BinaryStorage>(
@@ -1347,7 +1364,7 @@ pub mod tests {
     }
 
     pub fn set_expand_size_returns_true_when_checks_pass<T: BinaryStorage>(mut s: T) {
-        assert!(s.set_expand_size(1024));
+        assert!(s.set_expand_size(1024).is_ok());
     }
 
     pub fn set_expand_size_changes_expand_size_when_checks_pass<T: BinaryStorage>(mut s: T) {

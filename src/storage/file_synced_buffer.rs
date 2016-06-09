@@ -262,49 +262,49 @@ mod file_page_tests {
 
     // FilePage::new() tests
     #[test]
-    fn file_page_new_returns_none_when_align_is_zero() {
+    fn new_returns_none_when_align_is_zero() {
         let p = FilePage::new(256, 0);
         assert!(p.is_none());
     }
 
     #[test]
-    fn file_page_new_returns_none_when_max_size_not_power_of_2() {
+    fn new_returns_none_when_max_size_not_power_of_2() {
         let p = FilePage::new(257, 128);
         assert!(p.is_none());
     }
 
     #[test]
-    fn file_page_new_returns_none_when_align_not_power_of_2() {
+    fn new_returns_none_when_align_not_power_of_2() {
         let p = FilePage::new(256, 129);
         assert!(p.is_none());
     }
 
     #[test]
-    fn file_page_new_returns_none_when_align_larger_than_max_size() {
+    fn new_returns_none_when_align_larger_than_max_size() {
         let p = FilePage::new(256, 512);
         assert!(p.is_none());
     }
 
     #[test]
-    fn file_page_new_returns_file_page_instance_when_checks_pass() {
+    fn new_returns_file_page_instance_when_checks_pass() {
         let p = FilePage::new(256, 256);
         assert!(p.is_some());
     }
 
     #[test]
-    fn file_page_new_sets_max_size() {
+    fn new_sets_max_size() {
         let p = FilePage::new(512, 256).unwrap();
         assert_eq!(512, p.get_max_size());
     }
 
     #[test]
-    fn file_page_new_sets_align() {
+    fn new_sets_align() {
         let mut p = FilePage::new(256, 256).unwrap();
         assert_eq!(256, p.get_align());
     }
 
     #[test]
-    fn file_page_new_inits_memory_to_zeros() {
+    fn new_inits_memory_to_zeros() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(255, &[0x0]);
         let data = p.read(0, 256);
@@ -316,14 +316,14 @@ mod file_page_tests {
 
     // FilePage::read() tests
     #[test]
-    fn file_page_read_returns_empty_when_new() {
+    fn read_returns_empty_when_new() {
         let mut p = FilePage::new(256, 256).unwrap();
         let data = p.read(0, 4);
         assert_eq!(0, data.len());
     }
 
     #[test]
-    fn file_page_read_returns_empty_when_reading_from_past_actual_size() {
+    fn read_returns_empty_when_reading_from_past_actual_size() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(0, &[0x0, 0x1, 0x2, 0x3]);
         let data = p.read(4, 4);
@@ -331,7 +331,7 @@ mod file_page_tests {
     }
 
     #[test]
-    fn file_page_read_returns_remaining_data_when_past_actual_size() {
+    fn read_returns_remaining_data_when_past_actual_size() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(0, &[0x0, 0x1, 0x2, 0x3]);
         let data = p.read(2, 4);
@@ -340,7 +340,7 @@ mod file_page_tests {
     }
 
     #[test]
-    fn file_page_read_past_actual_size_does_not_increase_actual_size() {
+    fn read_past_actual_size_does_not_increase_actual_size() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(0, &[0x0, 0x1, 0x2, 0x3]);
         assert_eq!(4, p.get_actual_size());
@@ -349,7 +349,7 @@ mod file_page_tests {
     }
 
     #[test]
-    fn file_page_read_returns_zeros_for_unwritten_data() {
+    fn read_returns_zeros_for_unwritten_data() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(255, &[0x1]);
         assert_eq!(&[0x0, 0x0, 0x0, 0x0], p.read(0, 4));
@@ -359,7 +359,7 @@ mod file_page_tests {
     }
 
     #[test]
-    fn file_page_read_returns_written_data() {
+    fn read_returns_written_data() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(10, &[0x1, 0x2, 0x3, 0x4]);
         p.write(20, &[0x5, 0x6, 0x7, 0x8]);
@@ -369,35 +369,35 @@ mod file_page_tests {
 
     // FilePage::write() tests
     #[test] 
-    fn file_page_write_writes_data_at_beginning() {
+    fn write_writes_data_at_beginning() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(0, &[0x1, 0x2, 0x3, 0x4]);
         assert_eq!(&[0x1, 0x2, 0x3, 0x4], p.read(0, 4)); 
     }
 
     #[test]
-    fn file_page_write_writes_data_at_offset() {
+    fn write_writes_data_at_offset() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(10, &[0x1, 0x2, 0x3, 0x4]);
         assert_eq!(&[0x1, 0x2, 0x3, 0x4], p.read(10, 4)); 
     }
 
     #[test]
-    fn file_page_write_writes_remaining_data_until_end_when_writing_past_max_size() {
+    fn write_writes_remaining_data_until_end_when_writing_past_max_size() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(254, &[0x1, 0x2, 0x3, 0x4]);
         assert_eq!(&[0x1, 0x2], p.read(254, 2)); 
     }
 
     #[test]
-    fn file_page_writes_nothing_when_starting_after_max_size() {
+    fn writes_nothing_when_starting_after_max_size() {
         let mut p = FilePage::new(256, 256).unwrap();
         p.write(256, &[0x1, 0x2, 0x3, 0x4]);
         assert_eq!(&[0x0, 0x0], p.read(254, 2)); 
     }
 
     #[test]
-    fn file_page_write_increases_actual_size() {
+    fn write_increases_actual_size() {
         let mut p = FilePage::new(256, 256).unwrap();
         assert_eq!(0, p.get_actual_size());
         p.write(0, &[0x1, 0x2, 0x3, 0x4]);
@@ -407,7 +407,7 @@ mod file_page_tests {
     }
 
     #[test]
-    fn file_page_write_does_not_increase_actual_size_past_max_size() {
+    fn write_does_not_increase_actual_size_past_max_size() {
         let mut p = FilePage::new(256, 256).unwrap();
         assert_eq!(0, p.get_actual_size());
         p.write(0, &[0x1, 0x2, 0x3, 0x4]);
@@ -420,13 +420,13 @@ mod file_page_tests {
 
     // FilePage::get_max_size() tests
     #[test]
-    fn file_page_get_max_size_returns_max_size() {
+    fn get_max_size_returns_max_size() {
         let mut p = FilePage::new(256, 128).unwrap();
         assert_eq!(256, p.get_max_size());
     }
 
     #[test]
-    fn file_page_get_max_size_does_not_change_on_writes() {
+    fn get_max_size_does_not_change_on_writes() {
         let mut p = FilePage::new(256, 128).unwrap();
         assert_eq!(256, p.get_max_size());
         p.write(0, &[0x1, 0x2, 0x3, 0x4]);
@@ -439,13 +439,13 @@ mod file_page_tests {
 
     // FilePage::get_actual_size() tests
     #[test]
-    fn file_page_get_actual_size_returns_zero_when_new() {
+    fn get_actual_size_returns_zero_when_new() {
         let mut p = FilePage::new(256, 128).unwrap();
         assert_eq!(0, p.get_actual_size());
     }
 
     #[test]
-    fn file_page_get_actual_size_returns_actual_size() {
+    fn get_actual_size_returns_actual_size() {
         let mut p = FilePage::new(256, 128).unwrap();
         assert_eq!(0, p.get_actual_size());
         p.write(0, &[0x1, 0x2, 0x3, 0x4]);
@@ -456,7 +456,7 @@ mod file_page_tests {
 
     // FilePage::get_align() tests
     #[test]
-    fn file_page_get_align_returns_alignment() {
+    fn get_align_returns_alignment() {
         let mut p = FilePage::new(256, 128).unwrap();
         assert_eq!(128, p.get_align());
     }
@@ -469,6 +469,30 @@ mod file_page_tests {
 #[cfg(test)]
 mod file_synced_buffer_tests {
 
+    // read() tests
+    #[test]
+    fn read_returns_empty_on_blank_file() {
+    }
+
+    #[test]
+    fn read_returns_empty_when_reading_from_past_eof() {
+    }
+
+    #[test]
+    fn read_truncates_data_when_reading_past_eof() {
+    }
+
+    #[test]
+    fn read_reads_data_across_page_boundaries() {
+    }
+
+    #[test]
+    fn read_reads_data_across_multiple_pages() {
+    }
+
+    #[test]
+    fn read_returns_none_when_page_alloc_fails() {
+    }
 
 
 }
