@@ -121,6 +121,7 @@ impl BinaryStorage for FileBinaryStorage {
 }
 
 
+/*
 #[cfg(test)]
 mod file_binary_storage_tests {
 
@@ -1202,3 +1203,4 @@ mod file_binary_storage_tests {
 
 
 }
+*/
