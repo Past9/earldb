@@ -1,3 +1,4 @@
+/*
 #![feature(alloc, heap_api)]
 
 extern crate alloc;
@@ -119,6 +120,7 @@ impl Drop for MemoryJournal {
     }
 
 }
+*/
 
 
 /*
