@@ -1,6 +1,8 @@
 use error::{ Error };
 
 pub static ERR_MEM_ALLOC: &'static str = "Memory allocation failed";
+pub static ERR_ARITHMETIC_OVERFLOW_ON_EXPAND: &'static str = 
+    "Memory expansion failed due to arithmetic overflow";
 pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str = "Expansion size must be greater that zero";
 pub static ERR_INITIAL_CAP_TOO_SMALL: &'static str = "Initial capacity must be greater than zero";
 pub static ERR_ALIGN_TOO_SMALL: &'static str = "Alignment must be greater than zero";
@@ -9,6 +11,12 @@ pub static ERR_ALIGN_NOT_POWER_OF_2: &'static str = "Alignment must be a power o
 pub static ERR_INITIAL_CAP_NOT_POWER_OF_2: &'static str = "Initial capacity must be a power of 2";
 pub static ERR_EXPAND_SIZE_NOT_POWER_OF_2: &'static str = "Expansion size must be a power of 2";
 pub static ERR_ALIGN_LARGER_THAN_PAGE_SIZE: &'static str = "Alignment must be no larger than max page size";
+pub static ERR_WRITE_WHEN_CLOSED: & 'static str = "Cannot write when closed";
+pub static ERR_READ_WHEN_CLOSED: & 'static str = "Cannot read when closed";
+pub static ERR_EXPAND_WHEN_CLOSED: & 'static str = "Cannot read when closed";
+pub static ERR_WRITE_BEFORE_TXN_BOUNDARY: & 'static str = "Cannot write before transaction boundary";
+pub static ERR_READ_AFTER_TXN_BOUNDARY: & 'static str = "Cannot read after transaction boundary";
+pub static ERR_READ_PAST_END: & 'static str = "Cannot read past end of allocated storage";
 
 pub trait BinaryStorage {
 
@@ -17,42 +25,42 @@ pub trait BinaryStorage {
 
     fn is_open(&self) -> bool;
 
-    fn w_i8(&mut self, offset: usize, data: i8) -> bool;
-    fn w_i16(&mut self, offset: usize, data: i16) -> bool;
-    fn w_i32(&mut self, offset: usize, data: i32) -> bool;
-    fn w_i64(&mut self, offset: usize, data: i64) -> bool;
+    fn w_i8(&mut self, offset: usize, data: i8) -> Result<(), Error>;
+    fn w_i16(&mut self, offset: usize, data: i16) -> Result<(), Error>;
+    fn w_i32(&mut self, offset: usize, data: i32) -> Result<(), Error>;
+    fn w_i64(&mut self, offset: usize, data: i64) -> Result<(), Error>;
 
-    fn w_u8(&mut self, offset: usize, data: u8) -> bool;
-    fn w_u16(&mut self, offset: usize, data: u16) -> bool;
-    fn w_u32(&mut self, offset: usize, data: u32) -> bool;
-    fn w_u64(&mut self, offset: usize, data: u64) -> bool;
+    fn w_u8(&mut self, offset: usize, data: u8) -> Result<(), Error>;
+    fn w_u16(&mut self, offset: usize, data: u16) -> Result<(), Error>;
+    fn w_u32(&mut self, offset: usize, data: u32) -> Result<(), Error>;
+    fn w_u64(&mut self, offset: usize, data: u64) -> Result<(), Error>;
 
-    fn w_f32(&mut self, offset: usize, data: f32) -> bool;
-    fn w_f64(&mut self, offset: usize, data: f64) -> bool;
+    fn w_f32(&mut self, offset: usize, data: f32) -> Result<(), Error>;
+    fn w_f64(&mut self, offset: usize, data: f64) -> Result<(), Error>;
 
-    fn w_bool(&mut self, offset: usize, data: bool) -> bool;
+    fn w_bool(&mut self, offset: usize, data: bool) -> Result<(), Error>;
 
-    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> bool;
-    fn w_str(&mut self, offset: usize, data: &str) -> bool;
+    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> Result<(), Error>;
+    fn w_str(&mut self, offset: usize, data: &str) -> Result<(), Error>;
 
 
-    fn r_i8(&self, offset: usize) -> Option<i8>;
-    fn r_i16(&self, offset: usize) -> Option<i16>;
-    fn r_i32(&self, offset: usize) -> Option<i32>;
-    fn r_i64(&self, offset: usize) -> Option<i64>;
+    fn r_i8(&self, offset: usize) -> Result<i8, Error>;
+    fn r_i16(&self, offset: usize) -> Result<i16, Error>;
+    fn r_i32(&self, offset: usize) -> Result<i32, Error>;
+    fn r_i64(&self, offset: usize) -> Result<i64, Error>;
 
-    fn r_u8(&self, offset: usize) -> Option<u8>;
-    fn r_u16(&self, offset: usize) -> Option<u16>;
-    fn r_u32(&self, offset: usize) -> Option<u32>;
-    fn r_u64(&self, offset: usize) -> Option<u64>;
+    fn r_u8(&self, offset: usize) -> Result<u8, Error>;
+    fn r_u16(&self, offset: usize) -> Result<u16, Error>;
+    fn r_u32(&self, offset: usize) -> Result<u32, Error>;
+    fn r_u64(&self, offset: usize) -> Result<u64, Error>;
 
-    fn r_f32(&self, offset: usize) -> Option<f32>;
-    fn r_f64(&self, offset: usize) -> Option<f64>;
+    fn r_f32(&self, offset: usize) -> Result<f32, Error>;
+    fn r_f64(&self, offset: usize) -> Result<f64, Error>;
 
-    fn r_bool(&self, offset: usize) -> Option<bool>;
+    fn r_bool(&self, offset: usize) -> Result<bool, Error>;
 
-    fn r_bytes(&self, offset: usize, len: usize) -> Option<&[u8]>;
-    fn r_str(&self, offset: usize, len: usize) -> Option<&str>;
+    fn r_bytes(&self, offset: usize, len: usize) -> Result<&[u8], Error>;
+    fn r_str(&self, offset: usize, len: usize) -> Result<&str, Error>;
 
     fn fill(&mut self, start: Option<usize>, end: Option<usize>, val: u8) -> bool;
     fn assert_filled(&self, start: Option<usize>, end: Option<usize>, val: u8) -> bool;
@@ -68,7 +76,7 @@ pub trait BinaryStorage {
 
     fn get_capacity(&self) -> usize;
 
-    fn expand(&mut self, min_capacity: usize) -> bool;
+    fn expand(&mut self, min_capacity: usize) -> Result<(), Error>;
 
 }
 
@@ -100,22 +108,28 @@ pub mod tests {
     }
 
     // w_i8() tests
-    pub fn w_i8_returns_false_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(!s.w_i8(0, i8::max_value()));
+    pub fn w_i8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        let res = s.w_i8(0, i8::max_value());
+        assert!(res.is_err());
+        assert_eq!(binary_storage::ERR_WRITE_WHEN_CLOSED, res.unwrap_err().description());
     }
 
-    pub fn w_i8_returns_true_when_open<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.w_i8(0, i8::max_value()));
+    pub fn w_i8_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
+        assert!(s.is_open());
+        let res = s.w_i8(0, i8::max_value());
+        assert!(res.is_ok());
     }
 
     pub fn w_i8_does_not_write_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
         s.w_i8(0, i8::max_value());
         s.open();
         assert_eq!(0, s.r_i8(0).unwrap());
     }
 
     pub fn w_i8_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
+        assert!(s.get_use_txn_boundary());
         s.open();
         s.set_txn_boundary(4);
         assert!(!s.w_i8(3, i8::max_value()));

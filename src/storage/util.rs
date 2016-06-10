@@ -5,7 +5,6 @@ pub fn is_power_of_two(n: usize) -> bool {
 }
 
 
-
 #[cfg(test)]
 mod util_tests {
 

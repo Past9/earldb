@@ -7,7 +7,7 @@ use std::str;
 use alloc::heap;
 use std::{mem, ptr, slice};
 use storage::util;
-use error::{ Error, MemoryError };
+use error::{ Error, MemoryError, AssertionError };
 use storage::binary_storage;
 use storage::binary_storage::BinaryStorage;
 
@@ -90,21 +90,30 @@ impl MemoryBinaryStorage {
         (self.origin as usize + offset) as *mut T
     }
 
-    fn write<T>(&mut self, offset: usize, data: T) -> bool {
-        if !self.is_open { return false }
-        if self.use_txn_boundary && offset < self.txn_boundary { return false }
-        if !self.expand(offset + mem::size_of::<T>()) { return false }
+    fn write<T>(&mut self, offset: usize, data: T) -> Result<(), Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_WRITE_WHEN_CLOSED));
+        try!(AssertionError::assert_not(
+            self.use_txn_boundary && offset < self.txn_boundary,
+            binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
+        ));
+        try!(self.expand(offset + mem::size_of::<T>()));
 
         unsafe { ptr::write(self.ptr_mut(offset), data) }
-        true
+        Ok(())
     }
 
-    fn read<T: Copy>(&self, offset: usize) -> Option<T> {
-        if !self.is_open { return None }
-        if self.use_txn_boundary && (offset + mem::size_of::<T>()) > self.txn_boundary { return None }
-        if offset + mem::size_of::<T>() > self.capacity { return None }
+    fn read<T: Copy>(&self, offset: usize) -> Result<T, Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_WRITE_WHEN_CLOSED));
+        try!(AssertionError::assert_not(
+            self.use_txn_boundary && (offset + mem::size_of::<T>()) > self.txn_boundary,
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
+        ));
+        try!(AssertionError::assert(
+            offset + mem::size_of::<T>() <= self.capacity, 
+            binary_storage::ERR_READ_PAST_END
+        ));
 
-        unsafe { Some(ptr::read(self.ptr(offset))) }
+        unsafe { Ok(ptr::read(self.ptr(offset))) }
     }
 
     fn check_mem_params(
@@ -165,66 +174,71 @@ impl BinaryStorage for MemoryBinaryStorage {
         true
     }
 
-    fn w_i8(&mut self, offset: usize, data: i8) -> bool { self.write(offset, data) }
-    fn w_i16(&mut self, offset: usize, data: i16) -> bool { self.write(offset, data) }
-    fn w_i32(&mut self, offset: usize, data: i32) -> bool { self.write(offset, data) }
-    fn w_i64(&mut self, offset: usize, data: i64) -> bool { self.write(offset, data) }
+    fn w_i8(&mut self, offset: usize, data: i8) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i16(&mut self, offset: usize, data: i16) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i32(&mut self, offset: usize, data: i32) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i64(&mut self, offset: usize, data: i64) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_u8(&mut self, offset: usize, data: u8) -> bool { self.write(offset, data) }
-    fn w_u16(&mut self, offset: usize, data: u16) -> bool { self.write(offset, data) }
-    fn w_u32(&mut self, offset: usize, data: u32) -> bool { self.write(offset, data) }
-    fn w_u64(&mut self, offset: usize, data: u64) -> bool { self.write(offset, data) }
+    fn w_u8(&mut self, offset: usize, data: u8) -> Result<(), Error> { self.write(offset, data) }
+    fn w_u16(&mut self, offset: usize, data: u16) -> Result<(), Error> { self.write(offset, data) }
+    fn w_u32(&mut self, offset: usize, data: u32) -> Result<(), Error> { self.write(offset, data) }
+    fn w_u64(&mut self, offset: usize, data: u64) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_f32(&mut self, offset: usize, data: f32) -> bool { self.write(offset, data) }
-    fn w_f64(&mut self, offset: usize, data: f64) -> bool { self.write(offset, data) }
+    fn w_f32(&mut self, offset: usize, data: f32) -> Result<(), Error> { self.write(offset, data) }
+    fn w_f64(&mut self, offset: usize, data: f64) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_bool(&mut self, offset: usize, data: bool) -> bool { self.write(offset, data) }
+    fn w_bool(&mut self, offset: usize, data: bool) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> bool {
-        if !self.is_open { return false }
-        if self.use_txn_boundary && offset < self.txn_boundary { return false }
-        if !self.expand(offset + data.len()) { return false }
+    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> Result<(), Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_WRITE_WHEN_CLOSED));
+        try!(AssertionError::assert_not(
+            self.use_txn_boundary && offset < self.txn_boundary,
+            binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
+        ));
+        try!(self.expand(offset + data.len()));
 
         let dest = unsafe { slice::from_raw_parts_mut(self.ptr_mut(offset), data.len()) };
         dest.clone_from_slice(data);
-
-        true
+        Ok(())
     }
 
-    fn w_str(&mut self, offset: usize, data: &str) -> bool { self.w_bytes(offset, data.as_bytes()) }
-
-
-    fn r_i8(&self, offset: usize) -> Option<i8> { self.read(offset) }
-    fn r_i16(&self, offset: usize) -> Option<i16> { self.read(offset) }
-    fn r_i32(&self, offset: usize) -> Option<i32> { self.read(offset) }
-    fn r_i64(&self, offset: usize) -> Option<i64> { self.read(offset) }
-
-    fn r_u8(&self, offset: usize) -> Option<u8> { self.read(offset) }
-    fn r_u16(&self, offset: usize) -> Option<u16> { self.read(offset) }
-    fn r_u32(&self, offset: usize) -> Option<u32> { self.read(offset) }
-    fn r_u64(&self, offset: usize) -> Option<u64> { self.read(offset) }
-
-    fn r_f32(&self, offset: usize) -> Option<f32> { self.read(offset) }
-    fn r_f64(&self, offset: usize) -> Option<f64> { self.read(offset) }
-
-    fn r_bool(&self, offset: usize) -> Option<bool> { self.read(offset) }
-
-    fn r_bytes(&self, offset: usize, len: usize) -> Option<&[u8]> {
-        if !self.is_open { return None }
-        if self.use_txn_boundary && (offset + len) > self.txn_boundary { return None }
-        if offset + len > self.capacity { return None }
-
-        unsafe { Some(slice::from_raw_parts(self.ptr(offset), len)) }
+    fn w_str(&mut self, offset: usize, data: &str) -> Result<(), Error> { 
+        self.w_bytes(offset, data.as_bytes()) 
     }
 
-    fn r_str(&self, offset: usize, len: usize) -> Option<&str> {
-        match self.r_bytes(offset, len) {
-            Some(v) => match str::from_utf8(v) {
-                Ok(s) => Some(s),
-                Err(e) => None
-            },
-            None => None
-        }
+
+    fn r_i8(&self, offset: usize) -> Result<i8, Error> { self.read(offset) }
+    fn r_i16(&self, offset: usize) -> Result<i16, Error> { self.read(offset) }
+    fn r_i32(&self, offset: usize) -> Result<i32, Error> { self.read(offset) }
+    fn r_i64(&self, offset: usize) -> Result<i64, Error> { self.read(offset) }
+
+    fn r_u8(&self, offset: usize) -> Result<u8, Error> { self.read(offset) }
+    fn r_u16(&self, offset: usize) -> Result<u16, Error> { self.read(offset) }
+    fn r_u32(&self, offset: usize) -> Result<u32, Error> { self.read(offset) }
+    fn r_u64(&self, offset: usize) -> Result<u64, Error> { self.read(offset) }
+
+    fn r_f32(&self, offset: usize) -> Result<f32, Error> { self.read(offset) }
+    fn r_f64(&self, offset: usize) -> Result<f64, Error> { self.read(offset) }
+
+    fn r_bool(&self, offset: usize) -> Result<bool, Error> { self.read(offset) }
+
+    fn r_bytes(&self, offset: usize, len: usize) -> Result<&[u8], Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_WRITE_WHEN_CLOSED));
+        try!(AssertionError::assert_not(
+            self.use_txn_boundary && (offset + len) > self.txn_boundary,
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
+        ));
+        try!(AssertionError::assert(
+            offset + len <= self.capacity, 
+            binary_storage::ERR_READ_PAST_END
+        ));
+
+        unsafe { Ok(slice::from_raw_parts(self.ptr(offset), len)) }
+    }
+
+    fn r_str(&self, offset: usize, len: usize) -> Result<&str, Error> {
+        let b = try!(self.r_bytes(offset, len));
+        Ok(try!(str::from_utf8(b)))
     }
 
 
@@ -316,20 +330,21 @@ impl BinaryStorage for MemoryBinaryStorage {
     }
 
 
-    fn expand(&mut self, min_capacity: usize) -> bool {
-        if !self.is_open { return false }
+    fn expand(&mut self, min_capacity: usize) -> Result<(), Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_EXPAND_WHEN_CLOSED));
 
         // Determine the new size of the journal in multiples of expand_size
         let expand_increments = (min_capacity as f64 / self.expand_size as f64).ceil() as usize;
         let new_capacity = match expand_increments.checked_mul(self.expand_size) {
             Some(x) => x,
-            None => return false
+            None => return Err(Error::Memory(
+                MemoryError::new(binary_storage::ERR_ARITHMETIC_OVERFLOW_ON_EXPAND)
+            ))
         };
 
         // We don't want to reallocate (or even reduce the capacity) if we already have enough,
-        // so just do nothing and return true if we already have enough room
-        if new_capacity < self.capacity { return true }
-
+        // so just do nothing and return Ok if we already have enough room
+        if new_capacity < self.capacity { return Ok(()) }
 
         // Allocate new memory
         let ptr = unsafe {
@@ -342,7 +357,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         };
 
         if ptr.is_null() {
-            return false;
+            return Err(Error::Memory(MemoryError::new(binary_storage::ERR_MEM_ALLOC)));
         } else {
             // Set the new capacity and pointer, remembering the old capacity
             let old_capacity = self.capacity;
@@ -350,8 +365,8 @@ impl BinaryStorage for MemoryBinaryStorage {
             self.capacity = new_capacity;
             // Initialize the new storage (set all bytes to 0x00)
             self.fill(Some(old_capacity), Some(new_capacity), 0x0);
-            // Return true to indicate that allocation was successful
-            return true;
+            // Return Ok to indicate that allocation was successful
+            Ok(())
         }
     }
 
@@ -540,13 +555,13 @@ mod memory_binary_storage_tests {
 
     // w_i8() tests
     #[test]
-    fn w_i8_returns_false_when_closed() {
-        tests::w_i8_returns_false_when_closed(MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap());
+    fn w_i8_returns_err_when_closed() {
+        tests::w_i8_returns_err_when_closed(MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap());
     }
 
     #[test]
-    fn w_i8_returns_true_when_open() {
-        tests::w_i8_returns_true_when_open(MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap());
+    fn w_i8_returns_ok_when_open() {
+        tests::w_i8_returns_ok_when_open(MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap());
     }
 
     #[test]

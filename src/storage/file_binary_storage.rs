@@ -7,11 +7,11 @@ pub struct FileBinaryStorage {
 }
 impl FileBinaryStorage {
 
-    fn write<T>(&mut self, offset: usize, data: T) -> bool {
+    fn write<T>(&mut self, offset: usize, data: T) -> Result<(), Error> {
         unimplemented!();
     }
 
-    fn read<T: Copy>(&self, offset: usize) -> Option<T> {
+    fn read<T: Copy>(&self, offset: usize) -> Result<T, Error> {
         unimplemented!();
     }
 }
@@ -25,48 +25,48 @@ impl BinaryStorage for FileBinaryStorage {
         unimplemented!();
     }
 
-    fn w_i8(&mut self, offset: usize, data: i8) -> bool { self.write(offset, data) }
-    fn w_i16(&mut self, offset: usize, data: i16) -> bool { self.write(offset, data) }
-    fn w_i32(&mut self, offset: usize, data: i32) -> bool { self.write(offset, data) }
-    fn w_i64(&mut self, offset: usize, data: i64) -> bool { self.write(offset, data) }
+    fn w_i8(&mut self, offset: usize, data: i8) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i16(&mut self, offset: usize, data: i16) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i32(&mut self, offset: usize, data: i32) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i64(&mut self, offset: usize, data: i64) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_u8(&mut self, offset: usize, data: u8) -> bool { self.write(offset, data) }
-    fn w_u16(&mut self, offset: usize, data: u16) -> bool { self.write(offset, data) }
-    fn w_u32(&mut self, offset: usize, data: u32) -> bool { self.write(offset, data) }
-    fn w_u64(&mut self, offset: usize, data: u64) -> bool { self.write(offset, data) }
+    fn w_u8(&mut self, offset: usize, data: u8) -> Result<(), Error> { self.write(offset, data) }
+    fn w_u16(&mut self, offset: usize, data: u16) -> Result<(), Error> { self.write(offset, data) }
+    fn w_u32(&mut self, offset: usize, data: u32) -> Result<(), Error> { self.write(offset, data) }
+    fn w_u64(&mut self, offset: usize, data: u64) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_f32(&mut self, offset: usize, data: f32) -> bool { self.write(offset, data) }
-    fn w_f64(&mut self, offset: usize, data: f64) -> bool { self.write(offset, data) }
+    fn w_f32(&mut self, offset: usize, data: f32) -> Result<(), Error> { self.write(offset, data) }
+    fn w_f64(&mut self, offset: usize, data: f64) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_bool(&mut self, offset: usize, data: bool) -> bool { self.write(offset, data) }
+    fn w_bool(&mut self, offset: usize, data: bool) -> Result<(), Error> { self.write(offset, data) }
 
-    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> bool {
+    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> Result<(), Error> {
         unimplemented!();
     }
 
-    fn w_str(&mut self, offset: usize, data: &str) -> bool { self.w_bytes(offset, data.as_bytes()) }
+    fn w_str(&mut self, offset: usize, data: &str) -> Result<(), Error> { self.w_bytes(offset, data.as_bytes()) }
 
 
-    fn r_i8(&self, offset: usize) -> Option<i8> { self.read(offset) }
-    fn r_i16(&self, offset: usize) -> Option<i16> { self.read(offset) }
-    fn r_i32(&self, offset: usize) -> Option<i32> { self.read(offset) }
-    fn r_i64(&self, offset: usize) -> Option<i64> { self.read(offset) }
+    fn r_i8(&self, offset: usize) -> Result<i8, Error> { self.read(offset) }
+    fn r_i16(&self, offset: usize) -> Result<i16, Error> { self.read(offset) }
+    fn r_i32(&self, offset: usize) -> Result<i32, Error> { self.read(offset) }
+    fn r_i64(&self, offset: usize) -> Result<i64, Error> { self.read(offset) }
 
-    fn r_u8(&self, offset: usize) -> Option<u8> { self.read(offset) }
-    fn r_u16(&self, offset: usize) -> Option<u16> { self.read(offset) }
-    fn r_u32(&self, offset: usize) -> Option<u32> { self.read(offset) }
-    fn r_u64(&self, offset: usize) -> Option<u64> { self.read(offset) }
+    fn r_u8(&self, offset: usize) -> Result<u8, Error> { self.read(offset) }
+    fn r_u16(&self, offset: usize) -> Result<u16, Error> { self.read(offset) }
+    fn r_u32(&self, offset: usize) -> Result<u32, Error> { self.read(offset) }
+    fn r_u64(&self, offset: usize) -> Result<u64, Error> { self.read(offset) }
 
-    fn r_f32(&self, offset: usize) -> Option<f32> { self.read(offset) }
-    fn r_f64(&self, offset: usize) -> Option<f64> { self.read(offset) }
+    fn r_f32(&self, offset: usize) -> Result<f32, Error> { self.read(offset) }
+    fn r_f64(&self, offset: usize) -> Result<f64, Error> { self.read(offset) }
 
-    fn r_bool(&self, offset: usize) -> Option<bool> { self.read(offset) }
+    fn r_bool(&self, offset: usize) -> Result<bool, Error> { self.read(offset) }
 
-    fn r_bytes(&self, offset: usize, len: usize) -> Option<&[u8]> {
+    fn r_bytes(&self, offset: usize, len: usize) -> Result<&[u8], Error> {
         unimplemented!();
     }
 
-    fn r_str(&self, offset: usize, len: usize) -> Option<&str> {
+    fn r_str(&self, offset: usize, len: usize) -> Result<&str, Error> {
         unimplemented!();
     }
 
@@ -107,7 +107,7 @@ impl BinaryStorage for FileBinaryStorage {
     }
 
 
-    fn expand(&mut self, min_capacity: usize) -> bool {
+    fn expand(&mut self, min_capacity: usize) -> Result<(), Error> {
         unimplemented!();
     }
 
