@@ -715,18 +715,17 @@ mod memory_binary_storage_tests {
         );
     }
 
-    /*
     // w_u8() tests
     #[test]
-    fn w_u8_returns_false_when_closed() {
-        tests::w_u8_returns_false_when_closed(
+    fn w_u8_returns_err_when_closed() {
+        tests::w_u8_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn w_u8_returns_true_when_open() {
-        tests::w_u8_returns_true_when_open(
+    fn w_u8_returns_ok_when_open() {
+        tests::w_u8_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -754,15 +753,15 @@ mod memory_binary_storage_tests {
 
     // w_u16() tests
     #[test]
-    fn w_u16_returns_false_when_closed() {
-        tests::w_u16_returns_false_when_closed(
+    fn w_u16_returns_err_when_closed() {
+        tests::w_u16_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn w_u16_returns_true_when_open() {
-        tests::w_u16_returns_true_when_open(
+    fn w_u16_returns_ok_when_open() {
+        tests::w_u16_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -790,15 +789,15 @@ mod memory_binary_storage_tests {
 
     // w_u32() tests
     #[test]
-    fn w_u32_returns_false_when_closed() {
-        tests::w_u32_returns_false_when_closed(
+    fn w_u32_returns_err_when_closed() {
+        tests::w_u32_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn w_u32_returns_true_when_open() {
-        tests::w_u32_returns_true_when_open(
+    fn w_u32_returns_ok_when_open() {
+        tests::w_u32_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -826,15 +825,15 @@ mod memory_binary_storage_tests {
 
     // w_u64() tests
     #[test]
-    fn w_u64_returns_false_when_closed() {
-        tests::w_u64_returns_false_when_closed(
+    fn w_u64_returns_err_when_closed() {
+        tests::w_u64_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn w_u64_returns_true_when_open() {
-        tests::w_u64_returns_true_when_open(
+    fn w_u64_returns_ok_when_open() {
+        tests::w_u64_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -860,6 +859,7 @@ mod memory_binary_storage_tests {
         );
     }
 
+    /*
     // w_f32() tests
     #[test]
     fn w_f32_returns_false_when_closed() {
