@@ -1,3 +1,4 @@
+/*
 #![feature(alloc, heap_api)]
 
 extern crate alloc;
@@ -496,4 +497,4 @@ mod file_synced_buffer_tests {
 
 
 }
-
+*/
