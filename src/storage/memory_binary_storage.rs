@@ -1,6 +1,7 @@
 extern crate alloc;
 extern crate core;
 
+use std::vec::Vec;
 use std::str;
 use alloc::heap;
 use std::{mem, ptr, slice};
@@ -220,7 +221,7 @@ impl BinaryStorage for MemoryBinaryStorage {
 
     fn r_bool(&self, offset: usize) -> Result<bool, Error> { self.read(offset) }
 
-    fn r_bytes(&self, offset: usize, len: usize) -> Result<&[u8], Error> {
+    fn r_bytes(&self, offset: usize, len: usize) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
             self.use_txn_boundary && (offset + len) > self.txn_boundary,
@@ -231,12 +232,16 @@ impl BinaryStorage for MemoryBinaryStorage {
             binary_storage::ERR_READ_PAST_END
         ));
 
-        unsafe { Ok(slice::from_raw_parts(self.ptr(offset), len)) }
+        let src = unsafe { slice::from_raw_parts::<u8>(self.ptr(offset), len) };
+        let mut dst: Vec<u8> = Vec::with_capacity(len);
+        unsafe { dst.set_len(len) };
+        dst.copy_from_slice(src);
+        Ok(dst)
     }
 
-    fn r_str(&self, offset: usize, len: usize) -> Result<&str, Error> {
+    fn r_str(&self, offset: usize, len: usize) -> Result<String, Error> {
         let b = try!(self.r_bytes(offset, len));
-        Ok(try!(str::from_utf8(b)))
+        Ok(try!(str::from_utf8(b.as_slice())).to_string())
     }
 
 
@@ -1094,7 +1099,8 @@ mod memory_binary_storage_tests {
         );
     }
 
-    pub fn r_i8_result_is_not_mutated_on_subsequent_write() {
+    #[test]
+    fn r_i8_result_is_not_mutated_on_subsequent_write() {
         tests::r_i8_result_is_not_mutated_on_subsequent_write(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
@@ -1143,7 +1149,8 @@ mod memory_binary_storage_tests {
         );
     }
 
-    pub fn r_i16_result_is_not_mutated_on_subsequent_write() {
+    #[test]
+    fn r_i16_result_is_not_mutated_on_subsequent_write() {
         tests::r_i16_result_is_not_mutated_on_subsequent_write(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
@@ -1192,7 +1199,8 @@ mod memory_binary_storage_tests {
         );
     }
 
-    pub fn r_i32_result_is_not_mutated_on_subsequent_write() {
+    #[test]
+    fn r_i32_result_is_not_mutated_on_subsequent_write() {
         tests::r_i32_result_is_not_mutated_on_subsequent_write(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
@@ -1241,24 +1249,24 @@ mod memory_binary_storage_tests {
         );
     }
 
-    pub fn r_i64_result_is_not_mutated_on_subsequent_write() {
+    #[test]
+    fn r_i64_result_is_not_mutated_on_subsequent_write() {
         tests::r_i64_result_is_not_mutated_on_subsequent_write(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
-    /*
     // r_u8() tests
     #[test]
-    fn r_u8_returns_none_when_closed() {
-        tests::r_u8_returns_none_when_closed(
+    fn r_u8_returns_err_when_closed() {
+        tests::r_u8_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_u8_returns_some_when_open() {
-        tests::r_u8_returns_some_when_open(
+    fn r_u8_returns_ok_when_open() {
+        tests::r_u8_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1291,17 +1299,24 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_u8_result_is_not_mutated_on_subsequent_write() {
+        tests::r_u8_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_u16() tests
     #[test]
-    fn r_u16_returns_none_when_closed() {
-        tests::r_u16_returns_none_when_closed(
+    fn r_u16_returns_err_when_closed() {
+        tests::r_u16_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_u16_returns_some_when_open() {
-        tests::r_u16_returns_some_when_open(
+    fn r_u16_returns_ok_when_open() {
+        tests::r_u16_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1334,17 +1349,24 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_u16_result_is_not_mutated_on_subsequent_write() {
+        tests::r_u16_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_u32() tests
     #[test]
-    fn r_u32_returns_none_when_closed() {
-        tests::r_u32_returns_none_when_closed(
+    fn r_u32_returns_err_when_closed() {
+        tests::r_u32_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_u32_returns_some_when_open() {
-        tests::r_u32_returns_some_when_open(
+    fn r_u32_returns_ok_when_open() {
+        tests::r_u32_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1377,17 +1399,24 @@ mod memory_binary_storage_tests {
         );
     }
 
-    // r_i64() tests
     #[test]
-    fn r_u64_returns_none_when_closed() {
-        tests::r_u64_returns_none_when_closed(
+    fn r_u32_result_is_not_mutated_on_subsequent_write() {
+        tests::r_u32_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    // r_u64() tests
+    #[test]
+    fn r_u64_returns_err_when_closed() {
+        tests::r_u64_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_u64_returns_some_when_open() {
-        tests::r_u64_returns_some_when_open(
+    fn r_u64_returns_ok_when_open() {
+        tests::r_u64_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1420,17 +1449,24 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_u64_result_is_not_mutated_on_subsequent_write() {
+        tests::r_u64_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_f32() tests
     #[test]
-    fn r_f32_returns_none_when_closed() {
-        tests::r_f32_returns_none_when_closed(
+    fn r_f32_returns_err_when_closed() {
+        tests::r_f32_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_f32_returns_some_when_open() {
-        tests::r_f32_returns_some_when_open(
+    fn r_f32_returns_ok_when_open() {
+        tests::r_f32_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1463,17 +1499,24 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_f32_result_is_not_mutated_on_subsequent_write() {
+        tests::r_f32_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_f64() tests
     #[test]
-    fn r_f64_returns_none_when_closed() {
-        tests::r_f64_returns_none_when_closed(
+    fn r_f64_returns_err_when_closed() {
+        tests::r_f64_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_f64_returns_some_when_open() {
-        tests::r_f64_returns_some_when_open(
+    fn r_f64_returns_ok_when_open() {
+        tests::r_f64_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1506,17 +1549,24 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_f64_result_is_not_mutated_on_subsequent_write() {
+        tests::r_f64_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_bool() tests
     #[test]
-    fn r_bool_returns_none_when_closed() {
-        tests::r_bool_returns_none_when_closed(
+    fn r_bool_returns_err_when_closed() {
+        tests::r_bool_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_bool_returns_some_when_open() {
-        tests::r_bool_returns_some_when_open(
+    fn r_bool_returns_ok_when_open() {
+        tests::r_bool_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1549,17 +1599,24 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_bool_result_is_not_mutated_on_subsequent_write() {
+        tests::r_bool_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_bytes() tests
     #[test]
-    fn r_bytes_returns_none_when_closed() {
-        tests::r_bytes_returns_none_when_closed(
+    fn r_bytes_returns_err_when_closed() {
+        tests::r_bytes_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_bytes_returns_some_when_open() {
-        tests::r_bytes_returns_some_when_open(
+    fn r_bytes_returns_ok_when_open() {
+        tests::r_bytes_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1592,17 +1649,24 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_bytes_result_is_not_mutated_on_subsequent_write() {
+        tests::r_bytes_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_str() tests
     #[test]
-    fn r_str_returns_none_when_closed() {
-        tests::r_str_returns_none_when_closed(
+    fn r_str_returns_err_when_closed() {
+        tests::r_str_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_str_returns_some_when_open() {
-        tests::r_str_returns_some_when_open(
+    fn r_str_returns_ok_when_open() {
+        tests::r_str_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1635,6 +1699,14 @@ mod memory_binary_storage_tests {
         );
     }
 
+    #[test]
+    fn r_str_result_is_not_mutated_on_subsequent_write() {
+        tests::r_str_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    /*
     // fill() tests
     #[test]
     fn fill_returns_false_when_closed() {
