@@ -672,157 +672,239 @@ pub mod tests {
         assert_eq!("I \u{2661} Rust", s.r_str(255, 10).unwrap());
     }
 
-    /*
     // r_i8() tests
-    pub fn r_i8_returns_none_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(s.r_i8(0).is_none());
+    pub fn r_i8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.r_i8(0).unwrap_err().description()
+        );
     }
 
-    pub fn r_i8_returns_some_when_open<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i8(0).is_some());
+    pub fn r_i8_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert!(s.r_i8(0).is_ok());
     }
 
     pub fn r_i8_reads_zero_from_unwritten_storage<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.open().unwrap();
         assert_eq!(0, s.r_i8(0).unwrap());
     }
 
     pub fn r_i8_reads_written_data<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.w_i8(0, i8::max_value());
+        s.open().unwrap();
+        s.w_i8(0, i8::max_value()).unwrap();
         assert_eq!(i8::max_value(), s.r_i8(0).unwrap());
-        s.w_i8(32, i8::max_value());
+        s.w_i8(32, i8::max_value()).unwrap();
         assert_eq!(i8::max_value(), s.r_i8(32).unwrap());
     }
 
     pub fn r_i8_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.set_use_txn_boundary(true);
+        s.open().unwrap();
         s.set_txn_boundary(4);
-        assert!(s.r_i8(3).is_some());
-        assert!(s.r_i8(4).is_none());
+        assert!(s.r_i8(3).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            s.r_i8(4).unwrap_err().description()
+        );
     }
 
     pub fn r_i8_does_not_read_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i8(255).is_some());
-        assert!(s.r_i8(256).is_none());
+        s.open().unwrap();
+        assert!(s.r_i8(255).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_PAST_END,
+            s.r_i8(256).unwrap_err().description()
+        );
+    }
+
+    pub fn r_i8_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.w_i8(0, i8::max_value()).unwrap();
+        let res1 = s.r_i8(0).unwrap();
+        assert_eq!(255, res1);
+        s.w_i8(0, i8::max_value() - 10).unwrap();
+        let res2 = s.r_i8(0).unwrap();
+        assert_eq!(i8::max_value(), res1);
+        assert_eq!(i8::max_value() - 10, res2);
     }
 
     // r_i16() tests
-    pub fn r_i16_returns_none_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(s.r_i16(0).is_none());
+    pub fn r_i16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.r_i16(0).unwrap_err().description()
+        );
     }
 
-    pub fn r_i16_returns_some_when_open<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i16(0).is_some());
+    pub fn r_i16_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert!(s.r_i16(0).is_ok());
     }
 
     pub fn r_i16_reads_zero_from_unwritten_storage<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.open().unwrap();
         assert_eq!(0, s.r_i16(0).unwrap());
     }
 
     pub fn r_i16_reads_written_data<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.w_i16(0, i16::max_value());
+        s.open().unwrap();
+        s.w_i16(0, i16::max_value()).unwrap();
         assert_eq!(i16::max_value(), s.r_i16(0).unwrap());
-        s.w_i16(32, i16::max_value());
+        s.w_i16(32, i16::max_value()).unwrap();
         assert_eq!(i16::max_value(), s.r_i16(32).unwrap());
     }
 
     pub fn r_i16_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.set_use_txn_boundary(true);
+        s.open().unwrap();
         s.set_txn_boundary(4);
-        assert!(s.r_i16(2).is_some());
-        assert!(s.r_i16(3).is_none());
-        assert!(s.r_i16(4).is_none());
+        assert!(s.r_i16(2).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            s.r_i16(3).unwrap_err().description()
+        );
     }
 
     pub fn r_i16_does_not_read_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i16(254).is_some());
-        assert!(s.r_i16(255).is_none());
-        assert!(s.r_i16(256).is_none());
+        s.open().unwrap();
+        assert!(s.r_i16(254).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_PAST_END,
+            s.r_i16(256).unwrap_err().description()
+        );
+    }
+
+    pub fn r_i16_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.w_i16(0, i16::max_value()).unwrap();
+        let res1 = s.r_i16(0).unwrap();
+        assert_eq!(255, res1);
+        s.w_i16(0, i16::max_value() - 10).unwrap();
+        let res2 = s.r_i16(0).unwrap();
+        assert_eq!(i16::max_value(), res1);
+        assert_eq!(i16::max_value() - 10, res2);
     }
 
     // r_i32() tests
-    pub fn r_i32_returns_none_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(s.r_i32(0).is_none());
+    pub fn r_i32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.r_i32(0).unwrap_err().description()
+        );
     }
 
-    pub fn r_i32_returns_some_when_open<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i32(0).is_some());
+    pub fn r_i32_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert!(s.r_i32(0).is_ok());
     }
 
     pub fn r_i32_reads_zero_from_unwritten_storage<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.open().unwrap();
         assert_eq!(0, s.r_i32(0).unwrap());
     }
 
     pub fn r_i32_reads_written_data<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.w_i32(0, i32::max_value());
+        s.open().unwrap();
+        s.w_i32(0, i32::max_value()).unwrap();
         assert_eq!(i32::max_value(), s.r_i32(0).unwrap());
-        s.w_i32(32, i32::max_value());
+        s.w_i32(32, i32::max_value()).unwrap();
         assert_eq!(i32::max_value(), s.r_i32(32).unwrap());
     }
 
     pub fn r_i32_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.set_use_txn_boundary(true);
+        s.open().unwrap();
         s.set_txn_boundary(8);
-        assert!(s.r_i32(4).is_some());
-        assert!(s.r_i32(6).is_none());
-        assert!(s.r_i32(8).is_none());
+        assert!(s.r_i32(4).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            s.r_i32(5).unwrap_err().description()
+        );
     }
 
     pub fn r_i32_does_not_read_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i32(252).is_some());
-        assert!(s.r_i32(254).is_none());
-        assert!(s.r_i32(256).is_none());
+        s.open().unwrap();
+        assert!(s.r_i32(252).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_PAST_END,
+            s.r_i32(256).unwrap_err().description()
+        );
+    }
+
+    pub fn r_i32_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.w_i32(0, i32::max_value()).unwrap();
+        let res1 = s.r_i32(0).unwrap();
+        assert_eq!(255, res1);
+        s.w_i32(0, i32::max_value() - 10).unwrap();
+        let res2 = s.r_i32(0).unwrap();
+        assert_eq!(i32::max_value(), res1);
+        assert_eq!(i32::max_value() - 10, res2);
     }
 
     // r_i64() tests
-    pub fn r_i64_returns_none_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(s.r_i64(0).is_none());
+    pub fn r_i64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.r_i64(0).unwrap_err().description()
+        );
     }
 
-    pub fn r_i64_returns_some_when_open<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i64(0).is_some());
+    pub fn r_i64_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert!(s.r_i64(0).is_ok());
     }
 
     pub fn r_i64_reads_zero_from_unwritten_storage<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.open().unwrap();
         assert_eq!(0, s.r_i64(0).unwrap());
     }
 
     pub fn r_i64_reads_written_data<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.w_i64(0, i64::max_value());
+        s.open().unwrap();
+        s.w_i64(0, i64::max_value()).unwrap();
         assert_eq!(i64::max_value(), s.r_i64(0).unwrap());
-        s.w_i64(32, i64::max_value());
+        s.w_i64(32, i64::max_value()).unwrap();
         assert_eq!(i64::max_value(), s.r_i64(32).unwrap());
     }
 
     pub fn r_i64_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.set_txn_boundary(16);
-        assert!(s.r_i64(8).is_some());
-        assert!(s.r_i64(12).is_none());
-        assert!(s.r_i64(16).is_none());
+        s.set_use_txn_boundary(true);
+        s.open().unwrap();
+        s.set_txn_boundary(8);
+        assert!(s.r_i64(0).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            s.r_i64(1).unwrap_err().description()
+        );
     }
 
     pub fn r_i64_does_not_read_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.r_i64(248).is_some());
-        assert!(s.r_i64(252).is_none());
-        assert!(s.r_i64(256).is_none());
+        s.open().unwrap();
+        assert!(s.r_i64(248).is_ok());
+        assert_eq!(
+            binary_storage::ERR_READ_PAST_END,
+            s.r_i64(256).unwrap_err().description()
+        );
     }
 
+    pub fn r_i64_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.w_i64(0, i64::max_value()).unwrap();
+        let res1 = s.r_i64(0).unwrap();
+        assert_eq!(255, res1);
+        s.w_i64(0, i64::max_value() - 10).unwrap();
+        let res2 = s.r_i64(0).unwrap();
+        assert_eq!(i64::max_value(), res1);
+        assert_eq!(i64::max_value() - 10, res2);
+    }
+
+    /*
     // r_u8() tests
     pub fn r_u8_returns_none_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(s.r_u8(0).is_none());

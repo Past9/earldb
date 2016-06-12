@@ -1051,18 +1051,17 @@ mod memory_binary_storage_tests {
         );
     }
 
-    /*
     // r_i8() tests
     #[test]
-    fn r_i8_returns_none_when_closed() {
-        tests::r_i8_returns_none_when_closed(
+    fn r_i8_returns_err_when_closed() {
+        tests::r_i8_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_i8_returns_some_when_open() {
-        tests::r_i8_returns_some_when_open(
+    fn r_i8_returns_ok_when_open() {
+        tests::r_i8_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1084,7 +1083,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_i8_does_not_read_past_txn_boundary() {
         tests::r_i8_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1095,17 +1094,23 @@ mod memory_binary_storage_tests {
         );
     }
 
+    pub fn r_i8_result_is_not_mutated_on_subsequent_write() {
+        tests::r_i8_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_i16() tests
     #[test]
-    fn r_i16_returns_none_when_closed() {
-        tests::r_i16_returns_none_when_closed(
+    fn r_i16_returns_err_when_closed() {
+        tests::r_i16_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_i16_returns_some_when_open() {
-        tests::r_i16_returns_some_when_open(
+    fn r_i16_returns_ok_when_open() {
+        tests::r_i16_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1127,7 +1132,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_i16_does_not_read_past_txn_boundary() {
         tests::r_i16_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1138,17 +1143,23 @@ mod memory_binary_storage_tests {
         );
     }
 
+    pub fn r_i16_result_is_not_mutated_on_subsequent_write() {
+        tests::r_i16_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_i32() tests
     #[test]
-    fn r_i32_returns_none_when_closed() {
-        tests::r_i32_returns_none_when_closed(
+    fn r_i32_returns_err_when_closed() {
+        tests::r_i16_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_i32_returns_some_when_open() {
-        tests::r_i32_returns_some_when_open(
+    fn r_i32_returns_ok_when_open() {
+        tests::r_i32_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1170,7 +1181,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_i32_does_not_read_past_txn_boundary() {
         tests::r_i32_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1181,17 +1192,23 @@ mod memory_binary_storage_tests {
         );
     }
 
+    pub fn r_i32_result_is_not_mutated_on_subsequent_write() {
+        tests::r_i32_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     // r_i64() tests
     #[test]
-    fn r_i64_returns_none_when_closed() {
-        tests::r_i64_returns_none_when_closed(
+    fn r_i64_returns_err_when_closed() {
+        tests::r_i64_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn r_i64_returns_some_when_open() {
-        tests::r_i64_returns_some_when_open(
+    fn r_i64_returns_ok_when_open() {
+        tests::r_i64_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1213,7 +1230,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_i64_does_not_read_past_txn_boundary() {
         tests::r_i64_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1224,6 +1241,13 @@ mod memory_binary_storage_tests {
         );
     }
 
+    pub fn r_i64_result_is_not_mutated_on_subsequent_write() {
+        tests::r_i64_result_is_not_mutated_on_subsequent_write(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    /*
     // r_u8() tests
     #[test]
     fn r_u8_returns_none_when_closed() {
@@ -1256,7 +1280,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_u8_does_not_read_past_txn_boundary() {
         tests::r_u8_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1299,7 +1323,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_u16_does_not_read_past_txn_boundary() {
         tests::r_u16_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1342,7 +1366,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_u32_does_not_read_past_txn_boundary() {
         tests::r_u32_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1385,7 +1409,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_u64_does_not_read_past_txn_boundary() {
         tests::r_u64_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1428,7 +1452,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_f32_does_not_read_past_txn_boundary() {
         tests::r_f32_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1471,7 +1495,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_f64_does_not_read_past_txn_boundary() {
         tests::r_f64_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1514,7 +1538,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_bool_does_not_read_past_txn_boundary() {
         tests::r_bool_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1557,7 +1581,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_bytes_does_not_read_past_txn_boundary() {
         tests::r_bytes_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1600,7 +1624,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn r_str_does_not_read_past_txn_boundary() {
         tests::r_str_does_not_read_past_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1671,28 +1695,28 @@ mod memory_binary_storage_tests {
     #[test]
     fn fill_returns_false_when_before_txn_boundary() {
         tests::fill_returns_false_when_before_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn fill_does_not_write_when_before_txn_boundary() {
         tests::fill_does_not_write_when_before_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn fill_returns_true_when_after_txn_boundary() {
         tests::fill_returns_true_when_after_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn fill_writes_when_after_txn_boundary() {
         tests::fill_writes_when_after_txn_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1786,7 +1810,7 @@ mod memory_binary_storage_tests {
     fn get_use_txn_boundary_returns_initialized_value() {
         tests::get_use_txn_boundary_returns_initialized_value(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap(),
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1800,7 +1824,7 @@ mod memory_binary_storage_tests {
     #[test]
     fn set_use_txn_boundary_resets_boundary_to_zero_when_false() {
         tests::set_use_txn_boundary_resets_boundary_to_zero_when_false(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1808,7 +1832,7 @@ mod memory_binary_storage_tests {
     fn get_txn_boundary_starts_at_0_whether_used_or_not() {
         tests::get_txn_boundary_starts_at_0_whether_used_or_not(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap(),
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
@@ -1829,42 +1853,42 @@ mod memory_binary_storage_tests {
     #[test]
     fn set_txn_boundary_returns_false_when_closed() {
         tests::set_txn_boundary_returns_false_when_closed(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn set_txn_boundary_does_not_change_boundary_when_closed() {
         tests::set_txn_boundary_does_not_change_boundary_when_closed(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn set_txn_boundary_returns_false_when_past_capacity() {
         tests::set_txn_boundary_returns_false_when_past_capacity(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn set_txn_boundary_does_not_change_boundary_when_past_capacity() {
         tests::set_txn_boundary_does_not_change_boundary_when_past_capacity(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn set_txn_boundary_does_not_expand_capacity_when_past_capacity() {
         tests::set_txn_boundary_does_not_expand_capacity_when_past_capacity(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
     fn set_txn_boundary_changes_boundary() {
         tests::set_txn_boundary_changes_boundary(
-            MemoryBinaryStorage::new(256, 256, true, 256, 4096).unwrap()
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
