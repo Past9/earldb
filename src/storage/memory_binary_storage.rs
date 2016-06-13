@@ -1812,71 +1812,71 @@ mod memory_binary_storage_tests {
         );
     }
 
-    /*
     // assert_filled() tests
     #[test]
-    fn assert_filled_retuns_false_when_closed() {
-        tests::assert_filled_retuns_false_when_closed(
+    fn is_filled_retuns_err_when_closed() {
+        tests::is_filled_retuns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_returns_false_when_start_offset_past_capacity() {
-        tests::assert_filled_returns_false_when_start_offset_past_capacity(
+    fn is_filled_returns_err_when_start_offset_past_capacity() {
+        tests::is_filled_returns_err_when_start_offset_past_capacity(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_returns_false_when_end_offset_at_or_before_start_offset() {
-        tests::assert_filled_returns_false_when_end_offset_at_or_before_start_offset(
+    fn is_filled_returns_err_when_end_offset_at_or_before_start_offset() {
+        tests::is_filled_returns_err_when_end_offset_at_or_before_start_offset(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_returns_false_when_end_offset_past_capacity() {
-        tests::assert_filled_returns_false_when_end_offset_past_capacity(
+    fn is_filled_returns_err_when_end_offset_past_capacity() {
+        tests::is_filled_returns_err_when_end_offset_past_capacity(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_checks_whether_all_bytes_in_range_match_value() {
-        tests::assert_filled_checks_whether_all_bytes_in_range_match_value(
+    fn is_filled_checks_whether_all_bytes_in_range_match_value() {
+        tests::is_filled_checks_whether_all_bytes_in_range_match_value(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_starts_from_start_offset() {
-        tests::assert_filled_starts_from_start_offset(
+    fn is_filled_starts_from_start_offset() {
+        tests::is_filled_starts_from_start_offset(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_starts_from_beginning_when_start_offset_is_none() {
-        tests::assert_filled_starts_from_beginning_when_start_offset_is_none(
+    fn is_filled_starts_from_beginning_when_start_offset_is_none() {
+        tests::is_filled_starts_from_beginning_when_start_offset_is_none(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_goes_to_end_offset() {
-        tests::assert_filled_goes_to_end_offset(
+    fn is_filled_goes_to_end_offset() {
+        tests::is_filled_goes_to_end_offset(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn assert_filled_goes_to_end_when_end_offset_is_none() {
-        tests::assert_filled_goes_to_end_when_end_offset_is_none(
+    fn is_filled_goes_to_end_when_end_offset_is_none() {
+        tests::is_filled_goes_to_end_when_end_offset_is_none(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
+    /*
     // get_use_txn_boundary(), set_use_txn_boundary(), get_txn_boundary(), and set_txn_boundary() tests
     #[test]
     fn get_use_txn_boundary_returns_initialized_value() {
