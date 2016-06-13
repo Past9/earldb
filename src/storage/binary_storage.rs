@@ -178,13 +178,13 @@ pub mod tests {
     pub fn w_i8_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(4);
+        s.set_txn_boundary(4).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_i8(3, i8::max_value()).unwrap_err().description()
         );
         assert!(s.w_i8(4, i8::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_i8(3).unwrap());
         assert_eq!(i8::max_value(), s.r_i8(4).unwrap());
     }
@@ -219,13 +219,13 @@ pub mod tests {
     pub fn w_i16_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(4);
+        s.set_txn_boundary(4).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_i16(3, i16::max_value()).unwrap_err().description()
         );
         assert!(s.w_i16(4, i16::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_i16(2).unwrap());
         assert_eq!(i16::max_value(), s.r_i16(4).unwrap());
     }
@@ -260,13 +260,13 @@ pub mod tests {
     pub fn w_i32_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_i32(7, i32::max_value()).unwrap_err().description()
         );
         assert!(s.w_i32(8, i32::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_i32(4).unwrap());
         assert_eq!(i32::max_value(), s.r_i32(8).unwrap());
     }
@@ -301,13 +301,13 @@ pub mod tests {
     pub fn w_i64_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_i64(7, i64::max_value()).unwrap_err().description()
         );
         assert!(s.w_i64(8, i64::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_i64(0).unwrap());
         assert_eq!(i64::max_value(), s.r_i64(8).unwrap());
     }
@@ -342,13 +342,13 @@ pub mod tests {
     pub fn w_u8_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(4);
+        s.set_txn_boundary(4).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_u8(3, u8::max_value()).unwrap_err().description()
         );
         assert!(s.w_u8(4, u8::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_u8(3).unwrap());
         assert_eq!(u8::max_value(), s.r_u8(4).unwrap());
     }
@@ -383,13 +383,13 @@ pub mod tests {
     pub fn w_u16_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(4);
+        s.set_txn_boundary(4).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_u16(3, u16::max_value()).unwrap_err().description()
         );
         assert!(s.w_u16(4, u16::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_u16(2).unwrap());
         assert_eq!(u16::max_value(), s.r_u16(4).unwrap());
     }
@@ -424,13 +424,13 @@ pub mod tests {
     pub fn w_u32_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_u32(7, u32::max_value()).unwrap_err().description()
         );
         assert!(s.w_u32(8, u32::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_u32(4).unwrap());
         assert_eq!(u32::max_value(), s.r_u32(8).unwrap());
     }
@@ -465,13 +465,13 @@ pub mod tests {
     pub fn w_u64_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_u64(7, u64::max_value()).unwrap_err().description()
         );
         assert!(s.w_u64(8, u64::max_value()).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0, s.r_u64(0).unwrap());
         assert_eq!(u64::max_value(), s.r_u64(8).unwrap());
     }
@@ -506,13 +506,13 @@ pub mod tests {
     pub fn w_f32_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_f32(7, 12345.6789).unwrap_err().description()
         );
         assert!(s.w_f32(8, 12345.6789).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0.0, s.r_f32(0).unwrap());
         assert_eq!(12345.6789, s.r_f32(8).unwrap());
     }
@@ -547,13 +547,13 @@ pub mod tests {
     pub fn w_f64_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY, 
             s.w_f64(7, 12345.6789).unwrap_err().description()
         );
         assert!(s.w_f64(8, 12345.6789).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(0.0, s.r_f64(0).unwrap());
         assert_eq!(12345.6789, s.r_f64(8).unwrap());
     }
@@ -590,13 +590,13 @@ pub mod tests {
     pub fn w_bool_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(4);
+        s.set_txn_boundary(4).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
             s.w_bool(3, true).unwrap_err().description()
         );
         assert!(s.w_bool(4, true).is_ok());
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(false, s.r_bool(3).unwrap());
         assert_eq!(true, s.r_bool(4).unwrap());
     }
@@ -633,13 +633,13 @@ pub mod tests {
     pub fn w_bytes_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
             s.w_bytes(7, &[0x0, 0x1, 0x2, 0x3, 0x4]).unwrap_err().description()
         );
         assert!(s.w_bytes(8, &[0x0, 0x1, 0x2, 0x3, 0x4]).is_ok());
-        s.set_txn_boundary(16);
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(vec!(0x0, 0x0, 0x0, 0x0, 0x0), s.r_bytes(3, 5).unwrap());
         assert_eq!(vec!(0x0, 0x1, 0x2, 0x3, 0x4), s.r_bytes(8, 5).unwrap());
     }
@@ -676,7 +676,7 @@ pub mod tests {
 
     pub fn w_str_does_not_write_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
-        s.w_str(0, "I \u{2661} Rust");
+        s.w_str(0, "I \u{2661} Rust").unwrap_err();
         s.open().unwrap();
         assert_eq!(
             str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), 
@@ -686,14 +686,14 @@ pub mod tests {
 
     pub fn w_str_does_not_write_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
-        s.open();
-        s.set_txn_boundary(16);
+        s.open().unwrap();
+        s.set_txn_boundary(16).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
             s.w_str(15, "I \u{2661} Rust").unwrap_err().description()
         );
         assert!(s.w_str(16, "I \u{2661} Rust").is_ok());
-        s.set_txn_boundary(32);
+        s.set_txn_boundary(32).unwrap();
         assert_eq!(
             str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), 
             s.r_str(6, 10).unwrap()
@@ -718,7 +718,7 @@ pub mod tests {
     }
 
     // r_i8() tests
-    pub fn r_i8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_i8_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -747,7 +747,7 @@ pub mod tests {
     pub fn r_i8_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(4);
+        s.set_txn_boundary(4).unwrap();
         assert!(s.r_i8(3).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -776,7 +776,7 @@ pub mod tests {
     }
 
     // r_i16() tests
-    pub fn r_i16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_i16_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -805,7 +805,7 @@ pub mod tests {
     pub fn r_i16_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(4);
+        s.set_txn_boundary(4).unwrap();
         assert!(s.r_i16(2).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -834,7 +834,7 @@ pub mod tests {
     }
 
     // r_i32() tests
-    pub fn r_i32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_i32_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -863,7 +863,7 @@ pub mod tests {
     pub fn r_i32_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_i32(4).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -892,7 +892,7 @@ pub mod tests {
     }
 
     // r_i64() tests
-    pub fn r_i64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_i64_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -921,7 +921,7 @@ pub mod tests {
     pub fn r_i64_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_i64(0).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -950,7 +950,7 @@ pub mod tests {
     }
 
     // r_u8() tests
-    pub fn r_u8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_u8_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -979,7 +979,7 @@ pub mod tests {
     pub fn r_u8_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_u8(7).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1008,7 +1008,7 @@ pub mod tests {
     }
 
     // r_u16() tests
-    pub fn r_u16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_u16_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1037,7 +1037,7 @@ pub mod tests {
     pub fn r_u16_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_u16(6).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1066,7 +1066,7 @@ pub mod tests {
     }
 
     // r_u32() tests
-    pub fn r_u32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_u32_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1095,7 +1095,7 @@ pub mod tests {
     pub fn r_u32_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_u32(4).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1124,7 +1124,7 @@ pub mod tests {
     }
 
     // r_u64() tests
-    pub fn r_u64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_u64_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1153,7 +1153,7 @@ pub mod tests {
     pub fn r_u64_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_u64(0).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1182,7 +1182,7 @@ pub mod tests {
     }
 
     // r_f32() tests
-    pub fn r_f32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_f32_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1211,7 +1211,7 @@ pub mod tests {
     pub fn r_f32_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_f32(4).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1240,7 +1240,7 @@ pub mod tests {
     }
 
     // r_f64() tests
-    pub fn r_f64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_f64_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1269,7 +1269,7 @@ pub mod tests {
     pub fn r_f64_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_f64(0).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1298,7 +1298,7 @@ pub mod tests {
     }
 
     // r_bool() tests
-    pub fn r_bool_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_bool_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1327,7 +1327,7 @@ pub mod tests {
     pub fn r_bool_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_bool(7).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1356,7 +1356,7 @@ pub mod tests {
     }
 
     // r_bytes() tests
-    pub fn r_bytes_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_bytes_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1385,7 +1385,7 @@ pub mod tests {
     pub fn r_bytes_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_bytes(6, 2).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1414,7 +1414,7 @@ pub mod tests {
     }
 
     // r_str() tests
-    pub fn r_str_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn r_str_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1443,7 +1443,7 @@ pub mod tests {
     pub fn r_str_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         s.open().unwrap();
-        s.set_txn_boundary(8);
+        s.set_txn_boundary(8).unwrap();
         assert!(s.r_str(6, 2).is_ok());
         assert_eq!(
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
@@ -1531,7 +1531,7 @@ pub mod tests {
     pub fn fill_returns_err_when_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.open().unwrap();
         s.set_use_txn_boundary(true);
-        s.set_txn_boundary(10);
+        s.set_txn_boundary(10).unwrap();
         assert_eq!(
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
             s.fill(Some(9), None, 0x1).unwrap_err().description()
@@ -1539,9 +1539,9 @@ pub mod tests {
     }
 
     pub fn fill_does_not_write_when_before_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
+        s.open().unwrap();
         s.set_use_txn_boundary(true);
-        s.set_txn_boundary(10);
+        s.set_txn_boundary(10).unwrap();
         s.fill(Some(9), None, 0x1).unwrap_err();
         assert!(s.is_filled(None, None, 0x0).unwrap());
     }
@@ -1549,14 +1549,14 @@ pub mod tests {
     pub fn fill_returns_ok_when_after_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.open().unwrap();
         s.set_use_txn_boundary(true);
-        s.set_txn_boundary(10);
+        s.set_txn_boundary(10).unwrap();
         assert!(s.fill(Some(10), None, 0x1).is_ok());
     }
 
     pub fn fill_writes_when_after_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.open().unwrap();
         s.set_use_txn_boundary(true);
-        s.set_txn_boundary(10);
+        s.set_txn_boundary(10).unwrap();
         s.fill(Some(10), None, 0x1).unwrap();
         assert!(s.is_filled(None, Some(10), 0x0).unwrap());
         assert!(s.is_filled(Some(10), None, 0x1).unwrap());
@@ -1586,7 +1586,7 @@ pub mod tests {
     }
 
     // is_filled() tests
-    pub fn is_filled_retuns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn is_filled_retuns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1680,14 +1680,14 @@ pub mod tests {
     ) {
         s.open().unwrap();
         s.set_use_txn_boundary(true);
-        s.set_txn_boundary(10);
+        s.set_txn_boundary(10).unwrap();
         assert_eq!(10, s.get_txn_boundary().unwrap());
         s.set_use_txn_boundary(false);
         s.set_use_txn_boundary(true);
         assert_eq!(0, s.get_txn_boundary().unwrap());
     }
 
-    pub fn get_txn_boundary_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+    pub fn get_txn_boundary_returns_err_when_closed<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,

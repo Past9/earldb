@@ -1198,7 +1198,7 @@ mod memory_binary_storage_tests {
     // r_i32() tests
     #[test]
     fn r_i32_returns_err_when_closed() {
-        tests::r_i16_returns_err_when_closed(
+        tests::r_i32_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1926,6 +1926,20 @@ mod memory_binary_storage_tests {
     #[test]
     fn set_use_txn_boundary_resets_boundary_to_zero_when_txn_boundary_turned_off() {
         tests::set_use_txn_boundary_resets_boundary_to_zero_when_txn_boundary_turned_off(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    #[test]
+    fn get_txn_boundary_returns_err_when_closed() {
+        tests::get_txn_boundary_returns_err_when_closed(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    #[test]
+    fn get_txn_boundary_returns_err_when_not_using_txn_boundary() {
+        tests::get_txn_boundary_returns_err_when_not_using_txn_boundary(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
