@@ -1,26 +1,45 @@
 use error::{ Error };
 
-pub static ERR_MEM_ALLOC: &'static str = "Memory allocation failed";
+pub static ERR_MEM_ALLOC: &'static str = 
+    "Memory allocation failed";
 pub static ERR_ARITHMETIC_OVERFLOW_ON_EXPAND: &'static str = 
     "Memory expansion failed due to arithmetic overflow";
-pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str = "Expansion size must be greater that zero";
-pub static ERR_INITIAL_CAP_TOO_SMALL: &'static str = "Initial capacity must be greater than zero";
-pub static ERR_ALIGN_TOO_SMALL: &'static str = "Alignment must be greater than zero";
-pub static ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2: &'static str = "Max page size must be a power of 2";
-pub static ERR_ALIGN_NOT_POWER_OF_2: &'static str = "Alignment must be a power of 2";
-pub static ERR_INITIAL_CAP_NOT_POWER_OF_2: &'static str = "Initial capacity must be a power of 2";
-pub static ERR_EXPAND_SIZE_NOT_POWER_OF_2: &'static str = "Expansion size must be a power of 2";
-pub static ERR_ALIGN_LARGER_THAN_PAGE_SIZE: &'static str = "Alignment must be no larger than max page size";
-pub static ERR_WRITE_BEFORE_TXN_BOUNDARY: & 'static str = "Cannot write before transaction boundary";
-pub static ERR_WRITE_PAST_END: & 'static str = "Cannot write past end of allocated storage";
-pub static ERR_READ_AFTER_TXN_BOUNDARY: & 'static str = "Cannot read after transaction boundary";
-pub static ERR_READ_PAST_END: & 'static str = "Cannot read past end of allocated storage";
+pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str = 
+    "Expansion size must be greater that zero";
+pub static ERR_INITIAL_CAP_TOO_SMALL: &'static str = 
+    "Initial capacity must be greater than zero";
+pub static ERR_ALIGN_TOO_SMALL: &'static str = 
+    "Alignment must be greater than zero";
+pub static ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2: &'static str = 
+    "Max page size must be a power of 2";
+pub static ERR_ALIGN_NOT_POWER_OF_2: &'static str = 
+    "Alignment must be a power of 2";
+pub static ERR_INITIAL_CAP_NOT_POWER_OF_2: &'static str = 
+    "Initial capacity must be a power of 2";
+pub static ERR_EXPAND_SIZE_NOT_POWER_OF_2: &'static str = 
+    "Expansion size must be a power of 2";
+pub static ERR_ALIGN_LARGER_THAN_PAGE_SIZE: &'static str = 
+    "Alignment must be no larger than max page size";
+pub static ERR_WRITE_BEFORE_TXN_BOUNDARY: & 'static str = 
+    "Cannot write before transaction boundary";
+pub static ERR_WRITE_PAST_END: & 'static str = 
+    "Cannot write past end of allocated storage";
+pub static ERR_READ_AFTER_TXN_BOUNDARY: & 'static str = 
+    "Cannot read after transaction boundary";
+pub static ERR_READ_PAST_END: & 'static str = 
+    "Cannot read past end of allocated storage";
+pub static ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY: & 'static str = 
+    "Cannot perform this operation when transaction boundary is not in use";
+pub static ERR_SET_TXN_BOUNDARY_PAST_END: & 'static str = 
+    "Cannot set transaction boundary past end of allocated storage";
 pub static ERR_OPERATION_INVALID_WHEN_OPEN: & 'static str = 
     "Cannot perform this operation when storage is open";
 pub static ERR_OPERATION_INVALID_WHEN_CLOSED: & 'static str = 
     "Cannot perform this operation when storage is closed";
-pub static ERR_WRITE_NOTHING: & 'static str = "End of write must be after start of write";
-pub static ERR_READ_NOTHING: & 'static str = "End of read must be after start of read";
+pub static ERR_WRITE_NOTHING: & 'static str = 
+    "End of write must be after start of write";
+pub static ERR_READ_NOTHING: & 'static str = 
+    "End of read must be after start of read";
 
 pub trait BinaryStorage {
 
@@ -72,8 +91,8 @@ pub trait BinaryStorage {
     fn get_use_txn_boundary(&self) -> bool;
     fn set_use_txn_boundary(&mut self, val: bool);
 
-    fn get_txn_boundary(&self) -> usize;
-    fn set_txn_boundary(&mut self, offset: usize) -> bool;
+    fn get_txn_boundary(&self) -> Result<usize, Error>;
+    fn set_txn_boundary(&mut self, offset: usize) -> Result<(), Error>;
 
     fn get_expand_size(&self) -> usize;
     fn set_expand_size(&mut self, expand_size: usize) -> Result<(), Error>;
@@ -96,6 +115,32 @@ pub mod tests {
 
 
     // open(), close(), and is_open() tests 
+    pub fn open_returns_err_when_already_open<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_OPEN,
+            s.open().unwrap_err().description()
+        );
+    }
+
+    pub fn close_returns_err_when_already_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.close().unwrap_err().description()
+        );
+    }
+
+    pub fn open_returns_ok_when_previously_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert!(s.open().is_ok());
+    }
+
+    pub fn close_returns_ok_when_previously_open<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert!(s.close().is_ok());
+    }
+
     pub fn is_closed_when_new<T: BinaryStorage>(s: T) {
         assert!(!s.is_open());
     }
@@ -1622,13 +1667,7 @@ pub mod tests {
         assert!(!s.is_filled(None, None, 0x0).unwrap());
     }
 
-    /*
     // get_use_txn_boundary(), set_use_txn_boundary(), get_txn_boundary(), and set_txn_boundary() tests
-    pub fn get_use_txn_boundary_returns_initialized_value<T: BinaryStorage>(mut s1: T, mut s2: T) {
-        assert!(!s1.get_use_txn_boundary());
-        assert!(s2.get_use_txn_boundary());
-    }
-
     pub fn set_use_txn_boundary_changes_value<T: BinaryStorage>(mut s: T) {
         s.set_use_txn_boundary(true);
         assert!(s.get_use_txn_boundary());
@@ -1636,73 +1675,113 @@ pub mod tests {
         assert!(!s.get_use_txn_boundary());
     }
 
-    pub fn set_use_txn_boundary_resets_boundary_to_zero_when_false<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.set_txn_boundary(10);
-        assert_eq!(10, s.get_txn_boundary());
-        s.set_use_txn_boundary(false);
-        assert_eq!(0, s.get_txn_boundary());
+    pub fn set_use_txn_boundary_resets_boundary_to_zero_when_txn_boundary_turned_off<T: BinaryStorage>(
+        mut s: T
+    ) {
+        s.open().unwrap();
         s.set_use_txn_boundary(true);
-        assert_eq!(0, s.get_txn_boundary());
+        s.set_txn_boundary(10);
+        assert_eq!(10, s.get_txn_boundary().unwrap());
+        s.set_use_txn_boundary(false);
+        s.set_use_txn_boundary(true);
+        assert_eq!(0, s.get_txn_boundary().unwrap());
     }
 
-    pub fn get_txn_boundary_starts_at_0_whether_used_or_not<T: BinaryStorage>(mut s1: T, mut s2: T) {
-        assert_eq!(0, s1.get_txn_boundary());
-        assert_eq!(0, s2.get_txn_boundary());
+    pub fn get_txn_boundary_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.get_txn_boundary().unwrap_err().description()
+        );
     }
 
-    pub fn set_txn_boundary_returns_false_when_not_using_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(!s.set_txn_boundary(10));
+    pub fn get_txn_boundary_returns_err_when_not_using_txn_boundary<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.set_use_txn_boundary(false);
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY,
+            s.get_txn_boundary().unwrap_err().description()
+        );
+    }
+
+    pub fn get_txn_boundary_starts_at_0<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
+        assert_eq!(0, s.get_txn_boundary().unwrap());
+    }
+
+    pub fn set_txn_boundary_returns_err_when_not_using_txn_boundary<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.set_use_txn_boundary(false);
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY,
+            s.set_txn_boundary(10).unwrap_err().description()
+        );
     }
 
     pub fn set_txn_boundary_does_not_change_boundary_when_not_using_txn_boundary<T: BinaryStorage>(
         mut s: T
     ) {
-        s.open();
-        s.set_txn_boundary(10);
-        assert_eq!(0, s.get_txn_boundary());
+        s.open().unwrap();
+        s.set_use_txn_boundary(false);
+        s.set_txn_boundary(10).unwrap_err();
+        s.set_use_txn_boundary(true);
+        assert_eq!(0, s.get_txn_boundary().unwrap());
     }
 
-    pub fn set_txn_boundary_returns_false_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(!s.set_txn_boundary(10));
+    pub fn set_txn_boundary_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.set_txn_boundary(10).unwrap_err().description()
+        );
     }
 
     pub fn set_txn_boundary_does_not_change_boundary_when_closed<T: BinaryStorage>(mut s: T) {
-        s.set_txn_boundary(10);
-        s.open();
-        assert_eq!(0, s.get_txn_boundary());
+        assert!(!s.is_open());
+        s.set_txn_boundary(10).unwrap_err();
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
+        assert_eq!(0, s.get_txn_boundary().unwrap());
     }
 
-    pub fn set_txn_boundary_returns_false_when_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(!s.set_txn_boundary(257));
-        assert!(s.set_txn_boundary(256));
+    pub fn set_txn_boundary_returns_err_when_past_capacity<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
+        assert_eq!(
+            binary_storage::ERR_SET_TXN_BOUNDARY_PAST_END,
+            s.set_txn_boundary(257).unwrap_err().description()
+        );
+
+        assert!(s.set_txn_boundary(256).is_ok());
     }
 
     pub fn set_txn_boundary_does_not_change_boundary_when_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.set_txn_boundary(257);
-        assert_eq!(0, s.get_txn_boundary());
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
+        s.set_txn_boundary(257).unwrap_err();
+        assert_eq!(0, s.get_txn_boundary().unwrap());
     }
 
     pub fn set_txn_boundary_does_not_expand_capacity_when_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert_eq!(256, s.get_capacity());
-        s.set_txn_boundary(257);
-        assert_eq!(256, s.get_capacity());
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
+        assert_eq!(256, s.get_capacity().unwrap());
+        s.set_txn_boundary(257).unwrap_err();
+        assert_eq!(256, s.get_capacity().unwrap());
     }
 
     pub fn set_txn_boundary_changes_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.set_txn_boundary(50);
-        assert_eq!(50, s.get_txn_boundary());
-        s.set_txn_boundary(25);
-        assert_eq!(25, s.get_txn_boundary());
-        s.set_txn_boundary(200);
-        assert_eq!(200, s.get_txn_boundary());
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
+        s.set_txn_boundary(50).unwrap();
+        assert_eq!(50, s.get_txn_boundary().unwrap());
+        s.set_txn_boundary(25).unwrap();
+        assert_eq!(25, s.get_txn_boundary().unwrap());
+        s.set_txn_boundary(200).unwrap();
+        assert_eq!(200, s.get_txn_boundary().unwrap());
     }
 
+    /*
     // get_expand_size() and set_expand_size() tests
     pub fn get_expand_size_returns_initial_expand_size<T: BinaryStorage>(mut s: T) {
         assert_eq!(512, s.get_expand_size());

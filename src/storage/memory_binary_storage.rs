@@ -326,17 +326,28 @@ impl BinaryStorage for MemoryBinaryStorage {
     }
 
 
-    fn get_txn_boundary(&self) -> usize {
-        self.txn_boundary
+    fn get_txn_boundary(&self) -> Result<usize, Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+        try!(AssertionError::assert(
+            self.use_txn_boundary, 
+            binary_storage::ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY
+        ));
+        Ok(self.txn_boundary)
     }
 
-    fn set_txn_boundary(&mut self, offset: usize) -> bool {
-        if !self.is_open { return false }
-        if !self.use_txn_boundary { return false }
-        if offset > self.capacity { return false }
+    fn set_txn_boundary(&mut self, offset: usize) -> Result<(), Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+        try!(AssertionError::assert(
+            self.use_txn_boundary, 
+            binary_storage::ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY
+        ));
+        try!(AssertionError::assert(
+            offset <= self.capacity, 
+            binary_storage::ERR_SET_TXN_BOUNDARY_PAST_END
+        ));
 
         self.txn_boundary = offset;
-        true
+        Ok(())
     }
 
 
@@ -422,6 +433,34 @@ mod memory_binary_storage_tests {
     use storage::memory_binary_storage::MemoryBinaryStorage;
 
     // open(), close(), and is_open() tests 
+    #[test]
+    pub fn open_returns_err_when_already_open() {
+        tests::open_returns_err_when_already_open(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    #[test]
+    pub fn close_returns_err_when_already_closed() {
+        tests::close_returns_err_when_already_closed(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    #[test]
+    pub fn open_returns_ok_when_previously_closed() {
+        tests::open_returns_ok_when_previously_closed(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
+    #[test]
+    pub fn close_returns_ok_when_previously_open() {
+        tests::close_returns_ok_when_previously_open(
+            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
+        );
+    }
+
     #[test]
     fn is_closed_when_new() {
         tests::is_closed_when_new(MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap());
@@ -1876,16 +1915,7 @@ mod memory_binary_storage_tests {
         );
     }
 
-    /*
     // get_use_txn_boundary(), set_use_txn_boundary(), get_txn_boundary(), and set_txn_boundary() tests
-    #[test]
-    fn get_use_txn_boundary_returns_initialized_value() {
-        tests::get_use_txn_boundary_returns_initialized_value(
-            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap(),
-            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
-        );
-    }
-
     #[test]
     fn set_use_txn_boundary_changes_value() {
         tests::set_use_txn_boundary_changes_value(
@@ -1894,23 +1924,22 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn set_use_txn_boundary_resets_boundary_to_zero_when_false() {
-        tests::set_use_txn_boundary_resets_boundary_to_zero_when_false(
+    fn set_use_txn_boundary_resets_boundary_to_zero_when_txn_boundary_turned_off() {
+        tests::set_use_txn_boundary_resets_boundary_to_zero_when_txn_boundary_turned_off(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn get_txn_boundary_starts_at_0_whether_used_or_not() {
-        tests::get_txn_boundary_starts_at_0_whether_used_or_not(
-            MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap(),
+    fn get_txn_boundary_starts_at_0() {
+        tests::get_txn_boundary_starts_at_0(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
 
     #[test]
-    fn set_txn_boundary_returns_false_when_not_using_txn_boundary() {
-        tests::set_txn_boundary_returns_false_when_not_using_txn_boundary(
+    fn set_txn_boundary_returns_err_when_not_using_txn_boundary() {
+        tests::set_txn_boundary_returns_err_when_not_using_txn_boundary(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1923,8 +1952,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn set_txn_boundary_returns_false_when_closed() {
-        tests::set_txn_boundary_returns_false_when_closed(
+    fn set_txn_boundary_returns_err_when_closed() {
+        tests::set_txn_boundary_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1937,8 +1966,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn set_txn_boundary_returns_false_when_past_capacity() {
-        tests::set_txn_boundary_returns_false_when_past_capacity(
+    fn set_txn_boundary_returns_err_when_past_capacity() {
+        tests::set_txn_boundary_returns_err_when_past_capacity(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1964,6 +1993,7 @@ mod memory_binary_storage_tests {
         );
     }
 
+    /*
     // get_expand_size() and set_expand_size() tests
     #[test]
     fn get_expand_size_returns_initial_expand_size() {
