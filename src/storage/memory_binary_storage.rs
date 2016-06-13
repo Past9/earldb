@@ -1706,11 +1706,10 @@ mod memory_binary_storage_tests {
         );
     }
 
-    /*
     // fill() tests
     #[test]
-    fn fill_returns_false_when_closed() {
-        tests::fill_returns_false_when_closed(
+    fn fill_returns_err_when_closed() {
+        tests::fill_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1723,8 +1722,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn fill_returns_true_when_open() {
-        tests::fill_returns_true_when_open(
+    fn fill_returns_ok_when_open() {
+        tests::fill_returns_ok_when_open(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1751,8 +1750,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn fill_returns_false_when_end_offset_is_before_start_offset() {
-        tests::fill_returns_false_when_end_offset_is_before_start_offset(
+    fn fill_returns_err_when_end_offset_is_before_start_offset() {
+        tests::fill_returns_err_when_end_offset_is_before_start_offset(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1765,8 +1764,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn fill_returns_false_when_before_txn_boundary() {
-        tests::fill_returns_false_when_before_txn_boundary(
+    fn fill_returns_err_when_before_txn_boundary() {
+        tests::fill_returns_err_when_before_txn_boundary(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1779,8 +1778,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn fill_returns_true_when_after_txn_boundary() {
-        tests::fill_returns_true_when_after_txn_boundary(
+    fn fill_returns_ok_when_after_txn_boundary() {
+        tests::fill_returns_ok_when_after_txn_boundary(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1793,8 +1792,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn fill_returns_false_when_past_capacity() {
-        tests::fill_returns_false_when_past_capacity(
+    fn fill_returns_err_when_past_capacity() {
+        tests::fill_returns_err_when_past_capacity(
             MemoryBinaryStorage::new(256, 256, false, 256, 4096).unwrap()
         );
     }
@@ -1813,6 +1812,7 @@ mod memory_binary_storage_tests {
         );
     }
 
+    /*
     // assert_filled() tests
     #[test]
     fn assert_filled_retuns_false_when_closed() {

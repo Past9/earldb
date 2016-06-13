@@ -1426,104 +1426,121 @@ pub mod tests {
         assert_eq!("barbaz", res2);
     }
 
-    /*
     // fill() tests
-    pub fn fill_returns_false_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(!s.fill(None, None, 0x1));
+    pub fn fill_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.fill(None, None, 0x1).unwrap_err().description()
+        );
     }
 
     pub fn fill_does_not_write_when_closed<T: BinaryStorage>(mut s: T) {
-        s.fill(None, None, 0x1);
-        s.open();
-        assert!(s.is_filled(None, None, 0x0));
+        assert!(!s.is_open());
+        s.fill(None, None, 0x1).unwrap_err();
+        s.open().unwrap();
+        assert_eq!(true, s.is_filled(None, None, 0x0).unwrap());
     }
 
-    pub fn fill_returns_true_when_open<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.fill(None, None, 0x1));
+    pub fn fill_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert!(s.fill(None, None, 0x1).is_ok());
     }
 
     pub fn fill_repeats_byte_in_storage_range<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.fill(Some(10), Some(20), 0x1));
-        assert!(s.is_filled(Some(0), Some(10), 0x0));
-        assert!(s.is_filled(Some(10), Some(20), 0x1));
-        assert!(s.is_filled(Some(20), None, 0x0));
+        s.open().unwrap();
+        assert!(s.fill(Some(10), Some(20), 0x1).is_ok());
+        assert_eq!(true, s.is_filled(Some(0), Some(10), 0x0).unwrap());
+        assert!(s.is_filled(Some(10), Some(20), 0x1).unwrap());
+        assert!(s.is_filled(Some(20), None, 0x0).unwrap());
     }
 
     pub fn fill_starts_from_beginning_when_start_offset_is_none<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.fill(None, Some(20), 0x1));
-        assert!(s.is_filled(Some(0), Some(20), 0x1));
-        assert!(s.is_filled(Some(20), None, 0x0));
+        s.open().unwrap();
+        assert_eq!(true, s.fill(None, Some(20), 0x1).is_ok());
+        assert!(s.is_filled(Some(0), Some(20), 0x1).unwrap());
+        assert!(s.is_filled(Some(20), None, 0x0).unwrap());
     }
 
     pub fn fill_goes_to_end_when_end_offset_is_none<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.fill(Some(10), None, 0x1));
-        assert!(s.is_filled(None, Some(10), 0x0));
-        assert!(s.is_filled(Some(10), None, 0x1));
+        s.open().unwrap();
+        assert!(s.fill(Some(10), None, 0x1).is_ok());
+        assert!(s.is_filled(None, Some(10), 0x0).unwrap());
+        assert!(s.is_filled(Some(10), None, 0x1).unwrap());
     }
 
-    pub fn fill_returns_false_when_end_offset_is_before_start_offset<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(!s.fill(Some(20), Some(10), 0x1));
+    pub fn fill_returns_err_when_end_offset_is_before_start_offset<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_WRITE_NOTHING,
+            s.fill(Some(20), Some(10), 0x1).unwrap_err().description()
+        );
     }
 
     pub fn fill_does_not_write_when_end_offset_is_before_start_offset<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.fill(Some(20), Some(10), 0x1);
-        assert!(s.is_filled(None, None, 0x0));
+        s.open().unwrap();
+        s.fill(Some(20), Some(10), 0x1).unwrap_err();
+        assert!(s.is_filled(None, None, 0x0).unwrap());
     }
 
-    pub fn fill_returns_false_when_before_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.get_use_txn_boundary());
+    pub fn fill_returns_err_when_before_txn_boundary<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
         s.set_txn_boundary(10);
-        assert!(!s.fill(Some(9), None, 0x1));
+        assert_eq!(
+            binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
+            s.fill(Some(9), None, 0x1).unwrap_err().description()
+        );
     }
 
     pub fn fill_does_not_write_when_before_txn_boundary<T: BinaryStorage>(mut s: T) {
         s.open();
-        assert!(s.get_use_txn_boundary());
+        s.set_use_txn_boundary(true);
         s.set_txn_boundary(10);
-        s.fill(Some(9), None, 0x1);
-        assert!(s.is_filled(None, None, 0x0));
+        s.fill(Some(9), None, 0x1).unwrap_err();
+        assert!(s.is_filled(None, None, 0x0).unwrap());
     }
 
-    pub fn fill_returns_true_when_after_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.get_use_txn_boundary());
+    pub fn fill_returns_ok_when_after_txn_boundary<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
         s.set_txn_boundary(10);
-        assert!(s.fill(Some(10), None, 0x1));
+        assert!(s.fill(Some(10), None, 0x1).is_ok());
     }
 
     pub fn fill_writes_when_after_txn_boundary<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.get_use_txn_boundary());
+        s.open().unwrap();
+        s.set_use_txn_boundary(true);
         s.set_txn_boundary(10);
-        s.fill(Some(10), None, 0x1);
-        assert!(s.is_filled(None, Some(10), 0x0));
-        assert!(s.is_filled(Some(10), None, 0x1));
+        s.fill(Some(10), None, 0x1).unwrap();
+        assert!(s.is_filled(None, Some(10), 0x0).unwrap());
+        assert!(s.is_filled(Some(10), None, 0x1).unwrap());
     }
 
-    pub fn fill_returns_false_when_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(!s.fill(Some(9), Some(257), 0x1));
+    pub fn fill_returns_err_when_past_capacity<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert_eq!(256, s.get_capacity().unwrap());
+        assert_eq!(
+            binary_storage::ERR_WRITE_PAST_END,
+            s.fill(Some(9), Some(257), 0x1).unwrap_err().description()
+        );
     }
 
     pub fn fill_does_not_write_when_past_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.fill(Some(9), Some(257), 0x1);
-        assert!(s.is_filled(None, None, 0x0));
+        s.open().unwrap();
+        assert_eq!(256, s.get_capacity().unwrap());
+        s.fill(Some(9), Some(257), 0x1).unwrap_err();
+        assert!(s.is_filled(None, None, 0x0).unwrap());
     }
 
     pub fn fill_does_not_expand_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.fill(Some(9), Some(257), 0x1);
-        assert_eq!(256, s.get_capacity());
+        s.open().unwrap();
+        assert_eq!(256, s.get_capacity().unwrap());
+        s.fill(Some(9), Some(257), 0x1).unwrap_err();
+        assert_eq!(256, s.get_capacity().unwrap());
     }
 
+    /*
     // is_filled() tests
     pub fn is_filled_retuns_false_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_filled(None, None, 0x0));
