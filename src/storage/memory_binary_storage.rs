@@ -233,8 +233,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         ));
 
         let src = unsafe { slice::from_raw_parts::<u8>(self.ptr(offset), len) };
-        let mut dst: Vec<u8> = Vec::with_capacity(len);
-        unsafe { dst.set_len(len) };
+        let mut dst = vec![0; len];
         dst.copy_from_slice(src);
         Ok(dst)
     }

@@ -1,5 +1,6 @@
 mod journal;
 mod util;
+mod file_page;
 mod file_synced_buffer;
 mod binary_storage;
 mod memory_binary_storage;

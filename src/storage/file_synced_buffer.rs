@@ -1,11 +1,10 @@
-/*
 #![feature(alloc, heap_api)]
 
 extern crate alloc;
 extern crate core;
 
 use std::fs::File;
-use std::io::{Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::str;
 use std::cmp;
 use alloc::heap;
@@ -13,101 +12,11 @@ use std::{mem, ptr, slice};
 use std::collections::HashMap;
 use storage::util;
 
+use error::{ Error };
+use storage::file_page::FilePage;
 
 
-struct FilePage {
-    origin: *const u8,
-    max_size: u32,
-    actual_size: u32,
-    align: usize
-}
-impl FilePage {
 
-    pub fn new(
-        max_size: u32,
-        align: usize
-    ) -> Option<FilePage> {
-        if !FilePage::check_mem_params(align, max_size) { return None }; 
-        
-        let origin = unsafe { heap::allocate(max_size as usize, align) };
-
-        if origin.is_null() { return None }
-
-        unsafe { ptr::write_bytes::<u8>(origin, 0x0, max_size as usize) };
-         
-        Some(FilePage {
-            origin: origin,
-            max_size: max_size,
-            actual_size: 0,
-            align: align
-        })
-    }
-
-    fn ptr(&self, offset: u32) -> *const u8 {
-        (self.origin as usize + offset as usize) as *const u8
-    }
-
-    fn ptr_mut(&mut self, offset: u32) -> *mut u8 {
-        (self.origin as usize + offset as usize) as *mut u8
-    }
-
-    fn check_mem_params(
-        align: usize,
-        max_size: u32,
-    ) -> bool {
-        // alignment must be greater than zero
-        if align < 1 { return false }
-        // Max size must be a power of 2 
-        if !util::is_power_of_two(max_size as usize) { return false }
-        // Alignment must be a power of 2
-        if !util::is_power_of_two(align) { return false }
-        // Alignment must be no larger than max size
-        if align > (max_size as usize) { return false }
-        // If all checks pass, return true
-        true
-    }
-
-    pub fn write(&mut self, offset: u32, data: &[u8]) {
-        let c_offset = offset as usize;
-        let c_max_size = self.max_size as usize;
-
-        let end_offset = cmp::min(c_offset + data.len(), c_max_size);
-
-        if c_offset > end_offset { return }
-
-        let trunc_len = end_offset - c_offset;
-
-        let dest = unsafe { slice::from_raw_parts_mut(self.ptr_mut(offset), trunc_len) };
-        dest.clone_from_slice(&data[0..trunc_len]);
-
-        self.actual_size = end_offset as u32;
-    }
-
-    pub fn read(&self, offset: u32, len: u32) -> &[u8] {
-        if offset >= self.actual_size { return &[] }
-
-        let end_offset = cmp::min(offset + len, self.actual_size);
-
-        if offset > end_offset { return &[] }
-
-        let trunc_len = end_offset - offset;
-
-        unsafe { slice::from_raw_parts(self.ptr(offset), trunc_len as usize) }
-    }
-
-    pub fn get_max_size(&self) -> u32 {
-        self.max_size
-    }
-
-    pub fn get_actual_size(&self) -> u32 {
-        self.actual_size
-    }
-
-    pub fn get_align(&self) -> usize {
-        self.align
-    }
-
-}
 
 
 pub struct FileSyncedBuffer {
@@ -134,6 +43,7 @@ impl FileSyncedBuffer {
         }
     }
 
+
     fn calc_page_range(&self, offset: u64, length: usize) -> (u64, u64) {
         let page_size = self.page_size as u64;
         let len = length as u64;
@@ -145,79 +55,77 @@ impl FileSyncedBuffer {
     fn calc_page_section(&self, page_index: u64, offset: u64, length: usize) -> (u32, u32) {
         let page_size = self.page_size as u64;
         let len = length as u64;
-        let offset_in_page = (page_index * page_size) % offset;
-        let mut len_in_page: u64 = 0;
-        if len + offset_in_page > page_size{
-            len_in_page = page_size - offset_in_page;
-        } else {
-            len_in_page = len - offset_in_page; 
-        }
-        (offset_in_page as u32, len_in_page as u32)
+
+        let page_start_offset = page_index * page_size;
+        let page_end_offset = page_start_offset + page_size;
+        let end_offset = offset + len;
+
+        let start_offset_in_page =
+            if page_start_offset < offset {
+                offset - page_start_offset
+            } else {
+                0
+            };
+
+        let end_offset_in_page =
+            if end_offset > page_end_offset {
+                page_size
+            } else {
+                end_offset - page_start_offset
+            };
+
+        (start_offset_in_page as u32, (end_offset_in_page - start_offset_in_page) as u32)
     }
 
-    fn get_page(&mut self, index: u64) -> Option<&FilePage> {
+    fn read_from_page(&mut self, index: u64, start: u32, len: u32) -> Result<Vec<u8>, Error> {
 
         match self.pages.get(&index) {
-            Some(p) => return Some(p),
+            Some(p) => return Ok(p.read(start, len)),
             None => ()
         };
 
-        let seekPos = index * self.page_size as u64;
+        let seek_pos = index * self.page_size as u64;
 
-        match self.file.seek(SeekFrom::Start(seekPos)) {
-            Ok(s) => if s != seekPos { return None },
-            Err(_) => return None
-        };
+        try!(self.file.seek(SeekFrom::Start(seek_pos)));
 
-
-
-        None
-
+        let mut buf = vec![0; self.page_size as usize];
         
+        let read_len = try!(self.file.read(buf.as_mut_slice()));
+        buf.truncate(read_len);
+
+        let mut page = FilePage::new(self.page_size, self.page_mem_align).unwrap();
+        page.write(0, buf.as_slice());
+
+        Ok(page.read(start, len))
+
 
     }
 
-    /*
-    fn get_page_mut(&mut self, index: u64) -> Option<&mut FilePage> {
-        match self.pages.get_mut(&index) {
-            Some(p) => Some(p),
-            None => {
-            }
-        }
-    }
-    */
-
-    pub fn read(&mut self, offset: u64, len: usize) -> &[u8] {
+    pub fn read(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
         let (start, end) = self.calc_page_range(offset, len);
 
-        let slice_ptr = unsafe { heap::allocate(len, 8) as *mut u8 };
+        println!("start {}", start);
+        println!("end {}", end);
+
+        let mut data = Vec::new();
         let mut total_len: usize = 0;
 
         for i in start..(end + 1) {
             let (start_in_page, len_in_page) = self.calc_page_section(i, offset, len);
-            match self.get_page(i) {
-                Some(mut p) => {
-                    let partial_data = p.read(start_in_page, len_in_page);                    
+            println!("sip {}", start_in_page);
+            println!("lip {}", len_in_page);
+            let partial_data = try!(self.read_from_page(i, start_in_page, len_in_page));
+            let partial_len = partial_data.len();
+            total_len += partial_data.len();
 
-                    if partial_data.len() < 1 { break };
+            data.extend(partial_data);
 
-                    unsafe {
-                        ptr::copy(
-                            partial_data.first().unwrap(),
-                            slice_ptr,
-                            partial_data.len()
-                        );
-                    }
-
-                    total_len += partial_data.len();
-
-                    if partial_data.len() < len_in_page as usize { break };
-                },
-                None => break
-            };
+            if partial_len < len_in_page as usize { break };
         }
 
-        unsafe { slice::from_raw_parts(slice_ptr as *const u8, total_len) } 
+        data.truncate(total_len);
+        Ok(data)
+
     }
 
     pub fn update(&mut self, offset: u64, data: &[u8]) {
@@ -253,216 +161,6 @@ impl FileSyncedBuffer {
 
 
 
-#[cfg(test)]
-mod file_page_tests {
-
-    use storage::file_synced_buffer::{
-        FilePage,
-        FileSyncedBuffer
-    };
-
-    // FilePage::new() tests
-    #[test]
-    fn new_returns_none_when_align_is_zero() {
-        let p = FilePage::new(256, 0);
-        assert!(p.is_none());
-    }
-
-    #[test]
-    fn new_returns_none_when_max_size_not_power_of_2() {
-        let p = FilePage::new(257, 128);
-        assert!(p.is_none());
-    }
-
-    #[test]
-    fn new_returns_none_when_align_not_power_of_2() {
-        let p = FilePage::new(256, 129);
-        assert!(p.is_none());
-    }
-
-    #[test]
-    fn new_returns_none_when_align_larger_than_max_size() {
-        let p = FilePage::new(256, 512);
-        assert!(p.is_none());
-    }
-
-    #[test]
-    fn new_returns_file_page_instance_when_checks_pass() {
-        let p = FilePage::new(256, 256);
-        assert!(p.is_some());
-    }
-
-    #[test]
-    fn new_sets_max_size() {
-        let p = FilePage::new(512, 256).unwrap();
-        assert_eq!(512, p.get_max_size());
-    }
-
-    #[test]
-    fn new_sets_align() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        assert_eq!(256, p.get_align());
-    }
-
-    #[test]
-    fn new_inits_memory_to_zeros() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(255, &[0x0]);
-        let data = p.read(0, 256);
-        assert_eq!(256, data.len());
-        for &b in data {
-            assert_eq!(b, 0x0);
-        }
-    }
-
-    // FilePage::read() tests
-    #[test]
-    fn read_returns_empty_when_new() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        let data = p.read(0, 4);
-        assert_eq!(0, data.len());
-    }
-
-    #[test]
-    fn read_returns_empty_when_reading_from_past_actual_size() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(0, &[0x0, 0x1, 0x2, 0x3]);
-        let data = p.read(4, 4);
-        assert_eq!(0, data.len());
-    }
-
-    #[test]
-    fn read_returns_remaining_data_when_past_actual_size() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(0, &[0x0, 0x1, 0x2, 0x3]);
-        let data = p.read(2, 4);
-        assert_eq!(2, data.len());
-        assert_eq!(&[0x2, 0x3], data);
-    }
-
-    #[test]
-    fn read_past_actual_size_does_not_increase_actual_size() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(0, &[0x0, 0x1, 0x2, 0x3]);
-        assert_eq!(4, p.get_actual_size());
-        p.read(2, 4);
-        assert_eq!(4, p.get_actual_size());
-    }
-
-    #[test]
-    fn read_returns_zeros_for_unwritten_data() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(255, &[0x1]);
-        assert_eq!(&[0x0, 0x0, 0x0, 0x0], p.read(0, 4));
-        assert_eq!(&[0x0, 0x0, 0x0, 0x0], p.read(64, 4));
-        assert_eq!(&[0x0, 0x0, 0x0, 0x0], p.read(128, 4));
-        assert_eq!(&[0x0, 0x0, 0x0, 0x1], p.read(252, 4));
-    }
-
-    #[test]
-    fn read_returns_written_data() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(10, &[0x1, 0x2, 0x3, 0x4]);
-        p.write(20, &[0x5, 0x6, 0x7, 0x8]);
-        assert_eq!(&[0x1, 0x2, 0x3, 0x4], p.read(10, 4));
-        assert_eq!(&[0x5, 0x6, 0x7, 0x8], p.read(20, 4));
-    }
-
-    // FilePage::write() tests
-    #[test] 
-    fn write_writes_data_at_beginning() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(0, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(&[0x1, 0x2, 0x3, 0x4], p.read(0, 4)); 
-    }
-
-    #[test]
-    fn write_writes_data_at_offset() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(10, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(&[0x1, 0x2, 0x3, 0x4], p.read(10, 4)); 
-    }
-
-    #[test]
-    fn write_writes_remaining_data_until_end_when_writing_past_max_size() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(254, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(&[0x1, 0x2], p.read(254, 2)); 
-    }
-
-    #[test]
-    fn writes_nothing_when_starting_after_max_size() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        p.write(256, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(&[0x0, 0x0], p.read(254, 2)); 
-    }
-
-    #[test]
-    fn write_increases_actual_size() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        assert_eq!(0, p.get_actual_size());
-        p.write(0, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(4, p.get_actual_size());
-        p.write(100, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(104, p.get_actual_size());
-    }
-
-    #[test]
-    fn write_does_not_increase_actual_size_past_max_size() {
-        let mut p = FilePage::new(256, 256).unwrap();
-        assert_eq!(0, p.get_actual_size());
-        p.write(0, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(4, p.get_actual_size());
-        p.write(252, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(256, p.get_actual_size());
-        p.write(400, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(256, p.get_actual_size());
-    }
-
-    // FilePage::get_max_size() tests
-    #[test]
-    fn get_max_size_returns_max_size() {
-        let mut p = FilePage::new(256, 128).unwrap();
-        assert_eq!(256, p.get_max_size());
-    }
-
-    #[test]
-    fn get_max_size_does_not_change_on_writes() {
-        let mut p = FilePage::new(256, 128).unwrap();
-        assert_eq!(256, p.get_max_size());
-        p.write(0, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(256, p.get_max_size());
-        p.write(252, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(256, p.get_max_size());
-        p.write(400, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(256, p.get_max_size());
-    }
-
-    // FilePage::get_actual_size() tests
-    #[test]
-    fn get_actual_size_returns_zero_when_new() {
-        let mut p = FilePage::new(256, 128).unwrap();
-        assert_eq!(0, p.get_actual_size());
-    }
-
-    #[test]
-    fn get_actual_size_returns_actual_size() {
-        let mut p = FilePage::new(256, 128).unwrap();
-        assert_eq!(0, p.get_actual_size());
-        p.write(0, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(4, p.get_actual_size());
-        p.write(100, &[0x1, 0x2, 0x3, 0x4]);
-        assert_eq!(104, p.get_actual_size());
-    }
-
-    // FilePage::get_align() tests
-    #[test]
-    fn get_align_returns_alignment() {
-        let mut p = FilePage::new(256, 128).unwrap();
-        assert_eq!(128, p.get_align());
-    }
-
-}
 
 
 
@@ -470,31 +168,67 @@ mod file_page_tests {
 #[cfg(test)]
 mod file_synced_buffer_tests {
 
+    use std::str;
+    use std::fs::{ File, OpenOptions};
+    use std::io::Read;
+    use storage::file_synced_buffer::FileSyncedBuffer;
+
+    pub static BASE_PATH: &'static str = "./test_data/storage/file_synced_buffer/";
+
+    fn path(filename: &str) -> String {
+        BASE_PATH.to_string() + filename
+    }
+
+    fn file_r(filename: &str) -> File {
+        OpenOptions::new()
+            .read(true)
+            .open(path(filename))
+            .unwrap()
+    }
+
     // read() tests
     #[test]
     fn read_returns_empty_on_blank_file() {
+        let mut b = FileSyncedBuffer::new(file_r("blank.txt"), 16, 16, 1);
+        assert_eq!(0, b.read(0, 128).unwrap().len());
     }
 
     #[test]
     fn read_returns_empty_when_reading_from_past_eof() {
+        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 16, 16, 1);
+        assert_eq!(0, b.read(10, 10).unwrap().len());
     }
 
     #[test]
     fn read_truncates_data_when_reading_past_eof() {
+        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 16, 16, 1);
+        assert_eq!(10, b.read(0, 16).unwrap().len());
+    }
+
+    #[test]
+    fn read_reads_data_in_single_page() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let res = b.read(35, 10).unwrap();
+        assert_eq!(10, res.len());
+        assert_eq!("etur adipi", str::from_utf8(res.as_slice()).unwrap());
     }
 
     #[test]
     fn read_reads_data_across_page_boundaries() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let res = b.read(25, 10).unwrap();
+        assert_eq!(10, res.len());
+        assert_eq!("t, consect", str::from_utf8(res.as_slice()).unwrap());
     }
 
     #[test]
     fn read_reads_data_across_multiple_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let res = b.read(40, 35).unwrap();
+        assert_eq!(35, res.len());
+        assert_eq!("adipiscing elit. Integer ut imperdi", str::from_utf8(res.as_slice()).unwrap());
     }
 
-    #[test]
-    fn read_returns_none_when_page_alloc_fails() {
-    }
 
 
 }
-*/
