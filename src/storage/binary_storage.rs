@@ -2,8 +2,8 @@ use error::{ Error };
 
 pub static ERR_MEM_ALLOC: &'static str = 
     "Memory allocation failed";
-pub static ERR_ARITHMETIC_OVERFLOW_ON_EXPAND: &'static str = 
-    "Memory expansion failed due to arithmetic overflow";
+pub static ERR_ARITHMETIC_OVERFLOW: &'static str = 
+    "Operation failed due to arithmetic overflow";
 pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str = 
     "Expansion size must be greater that zero";
 pub static ERR_INITIAL_CAP_TOO_SMALL: &'static str = 
@@ -1781,33 +1781,34 @@ pub mod tests {
         assert_eq!(200, s.get_txn_boundary().unwrap());
     }
 
-    /*
     // get_expand_size() and set_expand_size() tests
-    pub fn get_expand_size_returns_initial_expand_size<T: BinaryStorage>(mut s: T) {
+    pub fn get_expand_size_returns_initial_expand_size<T: BinaryStorage>(s: T) {
         assert_eq!(512, s.get_expand_size());
     }
 
     pub fn set_expand_size_returns_err_when_expand_size_is_zero<T: BinaryStorage>(mut s: T) {
-        let res = s.set_expand_size(0);
-        assert!(res.is_err());
-        assert_eq!(binary_storage::ERR_EXPAND_SIZE_TOO_SMALL, res.unwrap_err().description());
+        assert_eq!(
+            binary_storage::ERR_EXPAND_SIZE_TOO_SMALL, 
+            s.set_expand_size(0).unwrap_err().description()
+        );
     }
 
     pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_zero<T: BinaryStorage>(mut s: T) {
-        s.set_expand_size(0);
+        s.set_expand_size(0).unwrap_err();
         assert_eq!(512, s.get_expand_size());
     }
 
     pub fn set_expand_size_returns_err_when_expand_size_is_not_power_of_2<T: BinaryStorage>(mut s: T) {
-        let res = s.set_expand_size(513);
-        assert!(res.is_err());
-        assert_eq!(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, res.unwrap_err().description());
+        assert_eq!(
+            binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, 
+            s.set_expand_size(513).unwrap_err().description()
+        );
     }
 
     pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_not_power_of_2<T: BinaryStorage>(
         mut s: T
     ) {
-        s.set_expand_size(513);
+        s.set_expand_size(513).unwrap_err();
         assert_eq!(512, s.get_expand_size());
     }
 
@@ -1816,101 +1817,117 @@ pub mod tests {
     }
 
     pub fn set_expand_size_changes_expand_size_when_checks_pass<T: BinaryStorage>(mut s: T) {
-        s.set_expand_size(1024);
+        s.set_expand_size(1024).unwrap();
         assert_eq!(1024, s.get_expand_size());
     }
 
     pub fn capacity_increases_to_increments_of_last_set_expand_size<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.w_u8(256, 0x1);
-        assert_eq!(512, s.get_capacity());
-        s.set_expand_size(8);
-        s.w_u8(512, 0x1);
-        assert_eq!(520, s.get_capacity());
+        s.open().unwrap();
+        s.w_u8(256, 0x1).unwrap();
+        assert_eq!(512, s.get_capacity().unwrap());
+        s.set_expand_size(8).unwrap();
+        s.w_u8(512, 0x1).unwrap();
+        assert_eq!(520, s.get_capacity().unwrap());
     }
 
     // get_capacity() tests
-    pub fn get_capacity_returns_0_when_closed<T: BinaryStorage>(mut s: T) {
-        assert_eq!(0, s.get_capacity());
-        s.open();
-        s.close();
-        assert_eq!(0, s.get_capacity());
+    pub fn get_capacity_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+            s.get_capacity().unwrap_err().description()
+        );
+        s.open().unwrap();
+        s.close().unwrap();
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+            s.get_capacity().unwrap_err().description()
+        );
     }
 
     pub fn get_capacity_returns_initial_capacity_when_open<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert_eq!(256, s.get_capacity());
+        s.open().unwrap();
+        assert_eq!(256, s.get_capacity().unwrap());
     }
 
     pub fn get_capacity_returns_new_capacity_after_expansion<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.w_u8(256, 0x1);
-        assert_eq!(512, s.get_capacity());
+        s.open().unwrap();
+        s.w_u8(256, 0x1).unwrap();
+        assert_eq!(512, s.get_capacity().unwrap());
     }
 
     // expand() tests
-    pub fn expand_returns_false_when_closed<T: BinaryStorage>(mut s: T) {
-        assert!(!s.expand(10000));
+    pub fn expand_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+        assert!(!s.is_open());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            s.expand(10000).unwrap_err().description()
+        );
     }
 
     pub fn expand_does_not_change_capacity_when_closed<T: BinaryStorage>(mut s: T) {
-        s.expand(10000);
-        s.open();
-        assert_eq!(256, s.get_capacity());
+        s.expand(10000).unwrap_err();
+        s.open().unwrap();
+        assert_eq!(256, s.get_capacity().unwrap());
     }
 
-    pub fn expand_returns_true_when_already_has_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.set_expand_size(16);
-        assert!(s.expand(50));
+    pub fn expand_returns_ok_when_already_has_capacity<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        s.set_expand_size(16).unwrap();
+        assert!(s.expand(50).is_ok());
     }
 
     pub fn expand_does_not_change_capacity_when_already_has_capacity<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.set_expand_size(16);
-        s.expand(50);
-        assert_eq!(256, s.get_capacity());
+        s.open().unwrap();
+        s.set_expand_size(16).unwrap();
+        s.expand(50).unwrap();
+        assert_eq!(256, s.get_capacity().unwrap());
     }
 
-    pub fn expand_returns_false_when_allocation_arithmetic_overflows<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(!s.expand(usize::max_value()));
+    pub fn expand_returns_err_when_allocation_arithmetic_overflows<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_ARITHMETIC_OVERFLOW,
+            s.expand(usize::max_value()).unwrap_err().description()
+        );
     }
 
     pub fn expand_does_not_change_capacity_when_allocation_arithmetic_overflows<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.expand(usize::max_value());
-        assert_eq!(256, s.get_capacity());
+        s.open().unwrap();
+        s.expand(usize::max_value()).unwrap_err();
+        assert_eq!(256, s.get_capacity().unwrap());
     }
 
-    pub fn expand_returns_false_when_allocation_fails<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(!s.expand((usize::max_value() - 1024) as usize));
+    pub fn expand_returns_err_when_allocation_fails<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_MEM_ALLOC,
+            s.expand((usize::max_value() - 1024) as usize).unwrap_err().description()
+        );
     }
 
     pub fn expand_does_not_change_capacity_when_allocation_fails<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.expand((usize::max_value() - 1024) as usize);
-        assert_eq!(256, s.get_capacity());
+        s.open().unwrap();
+        s.expand((usize::max_value() - 1024) as usize).unwrap_err();
+        assert_eq!(256, s.get_capacity().unwrap());
     }
 
-    pub fn expand_returns_true_when_successful<T: BinaryStorage>(mut s: T) {
-        s.open();
-        assert!(s.expand(300));
+    pub fn expand_returns_ok_when_successful<T: BinaryStorage>(mut s: T) {
+        s.open().unwrap();
+        assert!(s.expand(300).is_ok());
     }
 
     pub fn expand_changes_capacity_by_expand_size_when_successful<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.expand(300);
-        assert_eq!(512, s.get_capacity());
+        s.open().unwrap();
+        s.expand(300).unwrap();
+        assert_eq!(512, s.get_capacity().unwrap());
     }
 
     pub fn expand_changes_capacity_by_multiples_of_expand_size_when_successful<T: BinaryStorage>(mut s: T) {
-        s.open();
-        s.expand(3000);
-        assert_eq!(3072, s.get_capacity());
+        s.open().unwrap();
+        s.expand(3000).unwrap();
+        assert_eq!(3072, s.get_capacity().unwrap());
     }
-    */
 
 
 }

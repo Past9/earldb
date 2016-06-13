@@ -376,7 +376,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         let new_capacity = match expand_increments.checked_mul(self.expand_size) {
             Some(x) => x,
             None => return Err(Error::Memory(
-                MemoryError::new(binary_storage::ERR_ARITHMETIC_OVERFLOW_ON_EXPAND)
+                MemoryError::new(binary_storage::ERR_ARITHMETIC_OVERFLOW)
             ))
         };
 
@@ -2007,7 +2007,6 @@ mod memory_binary_storage_tests {
         );
     }
 
-    /*
     // get_expand_size() and set_expand_size() tests
     #[test]
     fn get_expand_size_returns_initial_expand_size() {
@@ -2065,60 +2064,10 @@ mod memory_binary_storage_tests {
         );
     }
 
-    // get_align() and set_align() tests
-    #[test]
-    fn get_align_returns_initial_align() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        assert_eq!(1024, s.get_align());
-    }
-
-    #[test]
-    fn set_align_returns_err_when_align_is_zero() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        let res = s.set_align(0);
-        assert!(res.is_err());
-        assert_eq!(binary_storage::ERR_ALIGN_TOO_SMALL, res.unwrap_err().description());
-    }
-
-    #[test]
-    fn set_align_does_not_change_align_when_align_is_zero() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        s.set_align(0);
-        assert_eq!(1024, s.get_align());
-    }
-
-    #[test]
-    fn set_align_returns_false_when_align_is_not_power_of_2() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        let res = s.set_align(1025);
-        assert!(res.is_err());
-        assert_eq!(binary_storage::ERR_ALIGN_NOT_POWER_OF_2, res.unwrap_err().description());
-    }
-
-    #[test]
-    fn set_align_does_not_change_align_when_align_is_not_power_of_2() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        s.set_align(1025);
-        assert_eq!(1024, s.get_align());
-    }
-
-    #[test]
-    fn set_align_returns_true_when_checks_pass() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        assert!(s.set_align(2048).is_ok());
-    }
-
-    #[test]
-    fn set_align_changes_align_when_checks_pass() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
-        s.set_align(2048);
-        assert_eq!(2048, s.get_align());
-    }
-
     // get_capacity() tests
     #[test]
-    fn get_capacity_returns_0_when_closed() {
-        tests::get_capacity_returns_0_when_closed(
+    fn get_capacity_returns_err_when_closed() {
+        tests::get_capacity_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -2137,17 +2086,67 @@ mod memory_binary_storage_tests {
         );
     }
 
+    // get_align() and set_align() tests
+    #[test]
+    fn get_align_returns_initial_align() {
+        let s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert_eq!(1024, s.get_align());
+    }
+
+    #[test]
+    fn set_align_returns_err_when_align_is_zero() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        let res = s.set_align(0);
+        assert!(res.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_TOO_SMALL, res.unwrap_err().description());
+    }
+
+    #[test]
+    fn set_align_does_not_change_align_when_align_is_zero() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_align(0).unwrap_err();
+        assert_eq!(1024, s.get_align());
+    }
+
+    #[test]
+    fn set_align_returns_false_when_align_is_not_power_of_2() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        let res = s.set_align(1025);
+        assert!(res.is_err());
+        assert_eq!(binary_storage::ERR_ALIGN_NOT_POWER_OF_2, res.unwrap_err().description());
+    }
+
+    #[test]
+    fn set_align_does_not_change_align_when_align_is_not_power_of_2() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_align(1025).unwrap_err();
+        assert_eq!(1024, s.get_align());
+    }
+
+    #[test]
+    fn set_align_returns_true_when_checks_pass() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        assert!(s.set_align(2048).is_ok());
+    }
+
+    #[test]
+    fn set_align_changes_align_when_checks_pass() {
+        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        s.set_align(2048).unwrap();
+        assert_eq!(2048, s.get_align());
+    }
+
     // get_max_page_size() tests
     #[test]
     fn get_max_page_size_returns_max_page_size() {
-        let mut s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
+        let s = MemoryBinaryStorage::new(256, 512, true, 1024, 4096).unwrap();
         assert_eq!(4096, s.get_max_page_size());
     }
 
     // expand() tests
     #[test]
-    fn expand_returns_false_when_closed() {
-        tests::expand_returns_false_when_closed(
+    fn expand_returns_err_when_closed() {
+        tests::expand_returns_err_when_closed(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -2160,8 +2159,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn expand_returns_true_when_already_has_capacity() {
-        tests::expand_returns_true_when_already_has_capacity(
+    fn expand_returns_ok_when_already_has_capacity() {
+        tests::expand_returns_ok_when_already_has_capacity(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -2174,8 +2173,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn expand_returns_false_when_allocation_arithmetic_overflows() {
-        tests::expand_returns_false_when_allocation_arithmetic_overflows(
+    fn expand_returns_err_when_allocation_arithmetic_overflows() {
+        tests::expand_returns_err_when_allocation_arithmetic_overflows(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -2188,8 +2187,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn expand_returns_false_when_allocation_fails() {
-        tests::expand_returns_false_when_allocation_fails(
+    fn expand_returns_err_when_allocation_fails() {
+        tests::expand_returns_err_when_allocation_fails(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -2202,8 +2201,8 @@ mod memory_binary_storage_tests {
     }
 
     #[test]
-    fn expand_returns_true_when_successful() {
-        tests::expand_returns_true_when_successful(
+    fn expand_returns_ok_when_successful() {
+        tests::expand_returns_ok_when_successful(
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
@@ -2221,7 +2220,6 @@ mod memory_binary_storage_tests {
             MemoryBinaryStorage::new(256, 512, false, 1024, 4096).unwrap()
         );
     }
-    */
 
 
 }
