@@ -9,7 +9,7 @@ use std::str;
 use std::cmp;
 use alloc::heap;
 use std::{mem, ptr, slice};
-use std::collections::HashMap;
+use std::collections::{ HashMap, VecDeque };
 use storage::util;
 
 use error::{ Error };
@@ -19,16 +19,17 @@ use storage::file_page::FilePage;
 pub struct FileSyncedBuffer {
     file: File,
     page_size: u32,
-    max_pages: u16,
+    max_pages: u32,
     page_mem_align: usize,
-    pages: HashMap<u64, FilePage>
+    pages: HashMap<u64, FilePage>,
+    page_insertions: VecDeque<u64>
 }
 impl FileSyncedBuffer {
 
     pub fn new(
         file: File,
         page_size: u32,
-        max_pages: u16,
+        max_pages: u32,
         page_mem_align: usize
     ) -> FileSyncedBuffer {
         FileSyncedBuffer {
@@ -36,7 +37,8 @@ impl FileSyncedBuffer {
             page_size: page_size,
             max_pages: max_pages,
             page_mem_align: page_mem_align,
-            pages: HashMap::new()
+            pages: HashMap::new(),
+            page_insertions: VecDeque::new()
         }
     }
 
@@ -74,8 +76,29 @@ impl FileSyncedBuffer {
         (start_offset_in_page as u32, (end_offset_in_page - start_offset_in_page) as u32)
     }
 
+    fn remove_page(&mut self) {
+        if self.page_insertions.len() == 0 { return }
+        match self.page_insertions.pop_front() {
+            Some(i) => { 
+                self.pages.remove(&i); 
+            },
+            None => self.remove_page()
+        }
+    }
+
+    fn remove_pages(&mut self, room_for: u32) {
+        let rf = room_for as usize;
+        let max_pages = self.max_pages as usize;
+        if self.pages.len() + rf <= max_pages { return }
+        let num_to_rm = self.pages.len() - max_pages + rf;
+        for _ in 0..(num_to_rm) { self.remove_page() }
+    }
+
     fn insert_page(&mut self, index: u64, page: FilePage) {
+        if self.max_pages == 0 { return }
+        self.remove_pages(1);
         self.pages.insert(index, page); 
+        self.page_insertions.push_back(index);
     }
 
     fn read_from_page(&mut self, index: u64, start: u32, len: u32) -> Result<Vec<u8>, Error> {
@@ -159,16 +182,24 @@ impl FileSyncedBuffer {
         self.page_size
     }
 
-    pub fn get_max_pages(&self) -> u16 {
+    pub fn get_max_pages(&self) -> u32 {
         self.max_pages
     }
 
-    pub fn set_max_pages(&mut self, pages: u16) {
+    pub fn set_max_pages(&mut self, pages: u32) {
         self.max_pages = pages;
         // TODO: Remove old pages
     }
 
-    pub fn get_num_current_pages(&self) -> u16 {
+    pub fn get_num_current_pages(&self) -> u32 {
+        self.pages.len() as u32
+    }
+
+    pub fn get_current_page_indices(&self) -> Vec<u64> {
+        unimplemented!();
+    }
+
+    pub fn get_current_page_insertions(&self) -> Vec<u64> {
         unimplemented!();
     }
 
@@ -236,31 +267,6 @@ mod file_synced_buffer_tests {
     }
 
     // read() tests
-    /*
-    #[test]
-    fn read_bubbles_io_errors() {
-        let (mut f, p) = file_tmp_rw(); 
-        println!("before len: {}", f.metadata().unwrap().len());
-        f.write(&[0x1, 0x2, 0x3, 0x4]);
-        f.sync_all().unwrap();
-        rm_tmp(p);
-        f.sync_all().unwrap();
-        f.write(&[0x5, 0x6, 0x7]);
-        f.sync_all().unwrap();
-        println!("after len: {}", f.metadata().unwrap().len());
-        let mut b = FileSyncedBuffer::new(f, 16, 16, 1);
-        let res = b.read(0, 10);
-        println!("DATA: {:?}", res.unwrap());
-
-        assert!(false);
-        //assert!(res.is_err());
-        //assert!(match res.unwrap_err() {
-        //    Error::Io(_) => true,
-        //    _ => false
-        //});
-    }
-    */
-
     #[test]
     fn read_returns_empty_on_blank_file() {
         let mut b = FileSyncedBuffer::new(file_r("blank.txt"), 16, 16, 1);
@@ -432,6 +438,80 @@ mod file_synced_buffer_tests {
         rm_tmp(p);
     }
 
+    // page caching tests
+    #[test]
+    fn reads_1_page_when_caching_0_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 0, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(4, 4).unwrap();
+        assert_eq!(4, res.len());
+        assert_eq!("m ip", str::from_utf8(res.as_slice()).unwrap());
+        assert_eq!(0, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn reads_multiple_pages_when_caching_0_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 0, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(4, 32).unwrap();
+        assert_eq!(32, res.len());
+        assert_eq!("m ipsum dolor sit amet, consecte", str::from_utf8(res.as_slice()).unwrap());
+        assert_eq!(0, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn reads_1_page_when_caching_1_page() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 1, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(4, 4).unwrap();
+        assert_eq!(4, res.len());
+        assert_eq!("m ip", str::from_utf8(res.as_slice()).unwrap());
+        assert_eq!(1, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn reads_multiple_pages_when_caching_1_page() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 1, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(4, 32).unwrap();
+        assert_eq!(32, res.len());
+        assert_eq!("m ipsum dolor sit amet, consecte", str::from_utf8(res.as_slice()).unwrap());
+        assert_eq!(1, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn reads_1_page_when_caching_multiple_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(4, 4).unwrap();
+        assert_eq!(4, res.len());
+        assert_eq!("m ip", str::from_utf8(res.as_slice()).unwrap());
+        assert_eq!(1, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn reads_multiple_pages_when_caching_multiple_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(4, 32).unwrap();
+        assert_eq!(32, res.len());
+        assert_eq!("m ipsum dolor sit amet, consecte", str::from_utf8(res.as_slice()).unwrap());
+        assert_eq!(3, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn only_caches_up_to_max_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 3, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(4, 64).unwrap();
+        assert_eq!(64, res.len());
+        assert_eq!(
+            "m ipsum dolor sit amet, consectetur adipiscing elit. Integer ut ", 
+            str::from_utf8(res.as_slice()).unwrap()
+        );
+        assert_eq!(3, b.get_num_current_pages());
+    }
+    
 
 
 

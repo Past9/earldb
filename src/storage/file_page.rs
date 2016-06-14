@@ -94,6 +94,13 @@ impl FilePage {
         dst
     }
 
+    pub fn truncate(&mut self, len: u32) {
+        if len >= self.actual_size { return }
+        if len >= self.max_size { return }
+        self.actual_size = len;
+        unsafe { ptr::write_bytes::<u8>(self.ptr_mut(len), 0x0, (self.max_size - len) as usize) };
+    }
+
     pub fn get_max_size(&self) -> u32 {
         self.max_size
     }
@@ -273,6 +280,41 @@ mod file_page_tests {
         p.write(400, &[0x1, 0x2, 0x3, 0x4]);
         assert_eq!(256, p.get_actual_size());
     }
+
+    // FilePage::truncate() tests
+    #[test]
+    fn truncate_after_actual_size_does_not_truncate() {
+        let mut p = FilePage::new(256, 256).unwrap();
+        p.write(128, &[0x1, 0x2, 0x3, 0x4]);
+        assert_eq!(132, p.get_actual_size());
+        p.truncate(133);
+        assert_eq!(132, p.get_actual_size());
+        p.truncate(132);
+        assert_eq!(132, p.get_actual_size());
+    }
+
+    #[test]
+    fn truncate_reduces_actual_size() {
+        let mut p = FilePage::new(256, 256).unwrap();
+        p.write(128, &[0x1, 0x2, 0x3, 0x4]);
+        assert_eq!(132, p.get_actual_size());
+        p.truncate(100);
+        assert_eq!(100, p.get_actual_size());
+    }
+
+    #[test]
+    fn truncate_inits_truncated_memory_to_zeros() {
+        let mut p = FilePage::new(256, 256).unwrap();
+        p.write(128, &[0x1, 0x2, 0x3, 0x4]);
+        assert_eq!(132, p.get_actual_size());
+        p.truncate(130);
+        assert_eq!(130, p.get_actual_size());
+        p.write(200, &[0x1, 0x2, 0x3, 0x4]);
+        assert_eq!(204, p.get_actual_size());
+        assert_eq!(vec!(0x1, 0x2, 0x0, 0x0), p.read(128, 4));
+        assert_eq!(vec!(0x1, 0x2, 0x3, 0x4), p.read(200, 4));
+    }
+
 
     // FilePage::get_max_size() tests
     #[test]

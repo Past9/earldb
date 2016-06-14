@@ -1,6 +1,3 @@
-extern crate alloc;
-extern crate core;
-
 use std::vec::Vec;
 use std::str;
 use alloc::heap;
