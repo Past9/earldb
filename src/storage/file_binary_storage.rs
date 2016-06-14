@@ -6,6 +6,7 @@ use std::str;
 
 use byteorder::{ BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt };
 
+use storage::util;
 use storage::binary_storage;
 use storage::binary_storage::BinaryStorage;
 use storage::file_synced_buffer::FileSyncedBuffer;
@@ -39,8 +40,14 @@ impl FileBinaryStorage {
         buffer_max_pages: u32,
         expand_size: usize,
         use_txn_boundary: bool
-    ) -> FileBinaryStorage {
-        FileBinaryStorage {
+    ) -> Result<FileBinaryStorage, Error> {
+
+        try!(FileBinaryStorage::check_params(
+            expand_size,
+            initial_capacity
+        )); 
+
+        Ok(FileBinaryStorage {
             path: path,
             create: create,
             file: None,
@@ -53,7 +60,7 @@ impl FileBinaryStorage {
             expand_size: expand_size,
             use_txn_boundary: use_txn_boundary,
             txn_boundary: 0
-        }
+        })
     }
 
     fn write<T>(&mut self, offset: usize, data: &[u8]) -> Result<(), Error> {
@@ -104,6 +111,34 @@ impl FileBinaryStorage {
             Some(ref mut b) => Ok(b),
             None => Err(AssertionError::new(ERR_NO_FILE))
         }
+    }
+
+    fn check_params(
+        expand_size: usize,
+        initial_capacity: usize
+    ) -> Result<(), AssertionError> {
+        // Expansion size must be greater than zero
+        try!(AssertionError::assert(
+            expand_size > 0, 
+            binary_storage::ERR_EXPAND_SIZE_TOO_SMALL
+        ));
+        // Initial capacity must be greater than zero
+        try!(AssertionError::assert(
+            initial_capacity > 0, 
+            binary_storage::ERR_INITIAL_CAP_TOO_SMALL
+        ));
+        // Initial capacity must be a power of 2
+        try!(AssertionError::assert(
+            util::is_power_of_two(initial_capacity), 
+            binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2
+        ));
+        // Expansion size must be a power of 2
+        try!(AssertionError::assert(
+            util::is_power_of_two(expand_size), 
+            binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2
+        ));
+        // If all checks pass, return true
+        Ok(())
     }
 
 }
@@ -233,7 +268,6 @@ impl BinaryStorage for FileBinaryStorage {
         }
 
         let mut buffer = try!(self.buffer());
-
         buffer.update(offset as u64, data);
 
         Ok(())
@@ -367,7 +401,6 @@ impl BinaryStorage for FileBinaryStorage {
         }
 
         let mut buffer = try!(self.buffer());
-
         buffer.update(start_offset as u64, buf.as_slice());
 
         Ok(())
@@ -452,6 +485,11 @@ impl BinaryStorage for FileBinaryStorage {
     }
 
     fn set_expand_size(&mut self, expand_size: usize) -> Result<(), Error> {
+        try!(FileBinaryStorage::check_params(
+            expand_size,
+            self.initial_capacity
+        ));
+
         self.expand_size = expand_size;
         Ok(())
     }
@@ -474,7 +512,17 @@ impl BinaryStorage for FileBinaryStorage {
         if new_capacity <= self.capacity { return Ok(()) }
 
         // Allocate more disk space
-        try!(self.file()).set_len(new_capacity as u64);
+        {
+            let mut file = try!(self.file());
+            match file.set_len(new_capacity as u64) {
+                Ok(()) => {},
+                Err(_) => {
+                    return Err(Error::Assertion(AssertionError::new(binary_storage::ERR_STORAGE_ALLOC)));
+                }
+            };
+        }
+
+
 
         // Set the new capacity 
         self.capacity = new_capacity;
@@ -526,7 +574,19 @@ mod file_binary_storage_tests {
             16,
             512,
             false
-        )
+        ).unwrap()
+    }
+
+    fn get_storage_expand_size(expand_size: usize) -> FileBinaryStorage {
+        FileBinaryStorage::new(
+            rnd_path(),
+            true,
+            256,
+            16, 
+            16,
+            expand_size,
+            false
+        ).unwrap()
     }
 
 
@@ -1018,7 +1078,7 @@ mod file_binary_storage_tests {
     #[test]
     fn w_bytes_over_capacity_expands_storage_multiple_times() {
         tests::w_bytes_over_capacity_expands_storage_multiple_times(
-            get_storage()
+            get_storage_expand_size(4)
         );
     }
 
@@ -1061,7 +1121,7 @@ mod file_binary_storage_tests {
     #[test]
     fn w_str_over_capacity_expands_storage_multiple_times() {
         tests::w_str_over_capacity_expands_storage_multiple_times(
-            get_storage()
+            get_storage_expand_size(4)
         );
     }
 

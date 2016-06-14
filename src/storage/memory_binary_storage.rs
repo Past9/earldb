@@ -30,7 +30,7 @@ impl MemoryBinaryStorage {
         max_page_size: usize
     ) -> Result<MemoryBinaryStorage, Error> {
 
-        try!(MemoryBinaryStorage::check_mem_params(
+        try!(MemoryBinaryStorage::check_params(
             align,
             expand_size,
             initial_capacity,
@@ -63,7 +63,7 @@ impl MemoryBinaryStorage {
     }
 
     pub fn set_align(&mut self, align: usize) -> Result<(), Error> {
-        try!(MemoryBinaryStorage::check_mem_params(
+        try!(MemoryBinaryStorage::check_params(
             align,
             self.expand_size,
             self.capacity,
@@ -112,44 +112,52 @@ impl MemoryBinaryStorage {
         unsafe { Ok(ptr::read(self.ptr(offset))) }
     }
 
-    fn check_mem_params(
+    fn check_params(
         align: usize,
         expand_size: usize,
         initial_capacity: usize,
         max_page_size: usize
-    ) -> Result<(), MemoryError> {
+    ) -> Result<(), AssertionError> {
         // Expansion size must be greater than zero
-        if expand_size < 1 { 
-            return Err(MemoryError::new(binary_storage::ERR_EXPAND_SIZE_TOO_SMALL)); 
-        }
+        try!(AssertionError::assert(
+            expand_size > 0, 
+            binary_storage::ERR_EXPAND_SIZE_TOO_SMALL
+        ));
         // Initial capacity must be greater than zero
-        if initial_capacity < 1 { 
-            return Err(MemoryError::new(binary_storage::ERR_INITIAL_CAP_TOO_SMALL)); 
-        }
+        try!(AssertionError::assert(
+            initial_capacity > 0, 
+            binary_storage::ERR_INITIAL_CAP_TOO_SMALL
+        ));
         // Alignment must be greater than zero
-        if align < 1 { 
-            return Err(MemoryError::new(binary_storage::ERR_ALIGN_TOO_SMALL)); 
-        }
+        try!(AssertionError::assert(
+            align > 0, 
+            binary_storage::ERR_ALIGN_TOO_SMALL
+        ));
         // Max page size must be a power of 2 
-        if !util::is_power_of_two(max_page_size) { 
-            return Err(MemoryError::new(binary_storage::ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2)); 
-        }
+        try!(AssertionError::assert(
+            util::is_power_of_two(max_page_size), 
+            binary_storage::ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2
+        ));
         // Alignment must be a power of 2
-        if !util::is_power_of_two(align) { 
-            return Err(MemoryError::new(binary_storage::ERR_ALIGN_NOT_POWER_OF_2)); 
-        }
+        try!(AssertionError::assert(
+            util::is_power_of_two(align), 
+            binary_storage::ERR_ALIGN_NOT_POWER_OF_2
+        ));
         // Initial capacity must be a power of 2
-        if !util::is_power_of_two(initial_capacity) { 
-            return Err(MemoryError::new(binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2)); 
-        }
+        try!(AssertionError::assert(
+            util::is_power_of_two(initial_capacity), 
+            binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2
+        ));
         // Expansion size must be a power of 2
-        if !util::is_power_of_two(expand_size) { 
-            return Err(MemoryError::new(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2)); 
-        }
+        try!(AssertionError::assert(
+            util::is_power_of_two(expand_size), 
+            binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2
+        ));
         // Alignment must be no larger than max page size
-        if align > max_page_size { 
-            return Err(MemoryError::new(binary_storage::ERR_ALIGN_LARGER_THAN_PAGE_SIZE)); 
-        }
+        try!(AssertionError::assert(
+            align <= max_page_size,
+            binary_storage::ERR_ALIGN_LARGER_THAN_PAGE_SIZE
+        ));
         // If all checks pass, return true
         Ok(())
     }
@@ -352,7 +360,7 @@ impl BinaryStorage for MemoryBinaryStorage {
     }
 
     fn set_expand_size(&mut self, expand_size: usize) -> Result<(), Error> {
-        try!(MemoryBinaryStorage::check_mem_params(
+        try!(MemoryBinaryStorage::check_params(
             self.align,
             expand_size,
             self.capacity,
