@@ -4,7 +4,7 @@ mod file_page;
 mod file_synced_buffer;
 mod binary_storage;
 mod memory_binary_storage;
-//mod file_binary_storage;
+mod file_binary_storage;
 mod memory_journal;
 mod journal_writer;
 mod journal_reader;
