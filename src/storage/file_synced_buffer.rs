@@ -221,7 +221,7 @@ impl FileSyncedBuffer {
 
     pub fn set_max_pages(&mut self, pages: u32) {
         self.max_pages = pages;
-        // TODO: Remove old pages
+        self.remove_oldest_pages(0);
     }
 
     pub fn get_num_current_pages(&self) -> u32 {
@@ -237,10 +237,6 @@ impl FileSyncedBuffer {
     }
 
 }
-
-
-
-
 
 
 
@@ -467,6 +463,164 @@ mod file_synced_buffer_tests {
         rm_tmp(p);
     }
 
+    // truncate() tests
+    #[test]
+    fn truncate_to_0_removes_all_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        b.read(4, 64).unwrap();
+        assert_eq!(5, b.get_num_current_pages());
+        assert_eq!(vec!(0, 1, 2, 3, 4), b.get_current_page_insertions());
+        b.truncate(0);
+        assert_eq!(0, b.get_num_current_pages());
+        assert_eq!(Vec::<u64>::new(), b.get_current_page_insertions());
+    }
+
+    #[test]
+    fn truncate_removes_pages_past_len() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        b.read(4, 64).unwrap();
+        assert_eq!(5, b.get_num_current_pages());
+        assert_eq!(vec!(0, 1, 2, 3, 4), b.get_current_page_insertions());
+        b.truncate(45);
+        assert_eq!(3, b.get_num_current_pages());
+        assert_eq!(vec!(0, 1, 2), b.get_current_page_insertions());
+    }
+
+    #[test]
+    fn truncate_truncates_page_at_len() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res1 = b.read(32, 16).unwrap();
+        assert_eq!(16, res1.len());
+        assert_eq!("ectetur adipisci", str::from_utf8(res1.as_slice()).unwrap());
+        b.truncate(45);
+        let res2 = b.read(32, 16).unwrap();
+        assert_eq!(13, res2.len());
+        assert_eq!("ectetur adipi", str::from_utf8(res2.as_slice()).unwrap());
+    }
+
+    // get_page_size() tests
+    #[test]
+    fn get_page_size_returns_initialized_page_size() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 1);
+        assert_eq!(32, b.get_page_size());
+    }
+
+    // get_max_pages() and set_max_pages() tests
+    #[test]
+    fn get_max_pages_returns_initialized_max_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 1);
+        assert_eq!(64, b.get_max_pages());
+    }
+
+    #[test]
+    fn get_max_pages_returns_max_pages_after_set_max_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 1);
+        b.set_max_pages(20);
+        assert_eq!(20, b.get_max_pages());
+        b.set_max_pages(0);
+        assert_eq!(0, b.get_max_pages());
+    }
+
+    #[test]
+    fn set_max_pages_removes_oldest_pages_when_reduced() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        b.read(0, 64).unwrap();
+        assert_eq!(vec!(0, 1, 2, 3), b.get_current_page_insertions());
+        b.set_max_pages(2);
+        assert_eq!(vec!(2, 3), b.get_current_page_insertions());
+    }
+
+    #[test]
+    fn set_max_pages_allows_more_pages_when_increased() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 2, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        b.read(0, 64).unwrap();
+        assert_eq!(vec!(2, 3), b.get_current_page_insertions());
+        b.set_max_pages(4);
+        b.read(0, 64).unwrap();
+        assert_eq!(vec!(2, 3, 0, 1), b.get_current_page_insertions());
+    }
+
+    // get_num_current_pages() tests
+    #[test]
+    fn get_num_current_pages_starts_at_0() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn get_num_current_pages_increases_as_pages_are_read() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        b.read(0, 16).unwrap();
+        assert_eq!(1, b.get_num_current_pages());
+        b.read(16, 16).unwrap();
+        assert_eq!(2, b.get_num_current_pages());
+        b.read(32, 16).unwrap();
+        assert_eq!(3, b.get_num_current_pages());
+    }
+
+    #[test]
+    fn get_num_current_pages_does_not_return_more_than_max_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        b.read(0, 16).unwrap();
+        assert_eq!(1, b.get_num_current_pages());
+        b.read(16, 16).unwrap();
+        assert_eq!(2, b.get_num_current_pages());
+        b.read(32, 16).unwrap();
+        assert_eq!(3, b.get_num_current_pages());
+        b.read(48, 16).unwrap();
+        assert_eq!(4, b.get_num_current_pages());
+        b.read(64, 16).unwrap();
+        assert_eq!(4, b.get_num_current_pages());
+    }
+
+    // get_current_page_insertions() tests
+    #[test]
+    fn get_current_page_insertions_starts_empty() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        assert_eq!(0, b.get_current_page_insertions().len());
+    }
+
+    #[test]
+    fn get_current_page_insertions_adds_pages_in_order_of_insertion() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        b.read(16, 16).unwrap();
+        assert_eq!(vec!(1), b.get_current_page_insertions());
+        b.read(48, 16).unwrap();
+        assert_eq!(vec!(1, 3), b.get_current_page_insertions());
+        b.read(0, 16).unwrap();
+        assert_eq!(vec!(1, 3, 0), b.get_current_page_insertions());
+    }
+
+    #[test]
+    fn get_current_page_insertions_shows_oldest_pages_removed_first() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        b.read(16, 16).unwrap();
+        assert_eq!(vec!(1), b.get_current_page_insertions());
+        b.read(48, 16).unwrap();
+        assert_eq!(vec!(1, 3), b.get_current_page_insertions());
+        b.read(0, 16).unwrap();
+        assert_eq!(vec!(1, 3, 0), b.get_current_page_insertions());
+        b.read(32, 16).unwrap();
+        assert_eq!(vec!(1, 3, 0, 2), b.get_current_page_insertions());
+        b.read(64, 16).unwrap();
+        assert_eq!(vec!(3, 0, 2, 4), b.get_current_page_insertions());
+        b.read(96, 16).unwrap();
+        assert_eq!(vec!(0, 2, 4, 6), b.get_current_page_insertions());
+    }
+
+    // get_page_mem_align() tests
+    #[test]
+    #[test]
+    fn get_page_mem_align_returns_initialized_page_mem_align() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 4);
+        assert_eq!(4, b.get_page_mem_align());
+    }
+
     // page caching tests
     #[test]
     fn reads_1_page_when_caching_0_pages() {
@@ -547,44 +701,6 @@ mod file_synced_buffer_tests {
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(0, 128).unwrap();
         assert_eq!(3, b.get_num_current_pages());
-    }
-
-    // truncate() tests
-    #[test]
-    fn truncate_to_0_removes_all_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
-        assert_eq!(0, b.get_num_current_pages());
-        b.read(4, 64).unwrap();
-        assert_eq!(5, b.get_num_current_pages());
-        assert_eq!(vec!(0, 1, 2, 3, 4), b.get_current_page_insertions());
-        b.truncate(0);
-        assert_eq!(0, b.get_num_current_pages());
-        assert_eq!(Vec::<u64>::new(), b.get_current_page_insertions());
-    }
-
-    #[test]
-    fn truncate_removes_pages_past_len() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
-        assert_eq!(0, b.get_num_current_pages());
-        b.read(4, 64).unwrap();
-        assert_eq!(5, b.get_num_current_pages());
-        assert_eq!(vec!(0, 1, 2, 3, 4), b.get_current_page_insertions());
-        b.truncate(45);
-        assert_eq!(3, b.get_num_current_pages());
-        assert_eq!(vec!(0, 1, 2), b.get_current_page_insertions());
-    }
-
-    #[test]
-    fn truncate_truncates_page_at_len() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
-        assert_eq!(0, b.get_num_current_pages());
-        let res1 = b.read(32, 16).unwrap();
-        assert_eq!(16, res1.len());
-        assert_eq!("ectetur adipisci", str::from_utf8(res1.as_slice()).unwrap());
-        b.truncate(45);
-        let res2 = b.read(32, 16).unwrap();
-        assert_eq!(13, res2.len());
-        assert_eq!("ectetur adipi", str::from_utf8(res2.as_slice()).unwrap());
     }
     
 
