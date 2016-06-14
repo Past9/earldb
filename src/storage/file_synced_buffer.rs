@@ -5,6 +5,7 @@ extern crate core;
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use std::iter::FromIterator;
 use std::str;
 use std::cmp;
 use alloc::heap;
@@ -76,27 +77,35 @@ impl FileSyncedBuffer {
         (start_offset_in_page as u32, (end_offset_in_page - start_offset_in_page) as u32)
     }
 
-    fn remove_page(&mut self) {
+    fn remove_oldest_page(&mut self) {
         if self.page_insertions.len() == 0 { return }
         match self.page_insertions.pop_front() {
             Some(i) => { 
                 self.pages.remove(&i); 
             },
-            None => self.remove_page()
+            None => self.remove_oldest_page()
         }
     }
 
-    fn remove_pages(&mut self, room_for: u32) {
+    fn remove_oldest_pages(&mut self, room_for: u32) {
         let rf = room_for as usize;
         let max_pages = self.max_pages as usize;
         if self.pages.len() + rf <= max_pages { return }
         let num_to_rm = self.pages.len() - max_pages + rf;
-        for _ in 0..(num_to_rm) { self.remove_page() }
+        for _ in 0..(num_to_rm) { self.remove_oldest_page() }
+    }
+
+    fn remove_page(&mut self, index: u64) {
+        self.pages.remove(&index);
+        match self.page_insertions.iter().position(|&x| x == index) {
+            Some(i) => self.page_insertions.remove(i),
+            None => return
+        };
     }
 
     fn insert_page(&mut self, index: u64, page: FilePage) {
         if self.max_pages == 0 { return }
-        self.remove_pages(1);
+        self.remove_oldest_pages(1);
         self.pages.insert(index, page); 
         self.page_insertions.push_back(index);
     }
@@ -152,8 +161,6 @@ impl FileSyncedBuffer {
         let page_size = self.page_size as u64;
         let (start, end) = self.calc_page_range(offset, data.len());
 
-        println!("(start, end) = ({}, {})", start, end);
-
         let mut data_offset: u64 = 0;
 
         for i in start..(end + 1) {
@@ -166,7 +173,6 @@ impl FileSyncedBuffer {
 
             let start_in_data = i * page_size + start_in_page as u64 - data_offset;
             let end_in_data = start_in_data + (len_in_page as u64);
-            println!("(start_in_data, end_in_data) = ({}, {})", start_in_data, end_in_data);
             page.write(
                 start_in_page,
                 &data[(start_in_data as usize)..(end_in_data as usize)]
@@ -175,7 +181,34 @@ impl FileSyncedBuffer {
     }
 
     pub fn truncate(&mut self, len: u64) {
-        unimplemented!();
+        if len == 0 { 
+            self.pages.clear();
+            self.page_insertions.clear();
+            return;
+        }
+
+        let page_size = self.page_size as u64;
+
+        let last_page = len / page_size;         
+        let last_page_len = (len % page_size) as u32;
+        let to_remove = Vec::from_iter(
+            self.page_insertions.iter()
+                .filter(|&&p| p > last_page)
+                .map(|&p| p.clone())
+        );
+
+
+        for p in to_remove {
+            self.remove_page(p);
+        }
+
+        match self.pages.get_mut(&last_page) {
+            Some(p) => {
+                p.truncate(last_page_len);
+            },
+            None => ()
+        }
+
     }
 
     pub fn get_page_size(&self) -> u32 {
@@ -195,12 +228,8 @@ impl FileSyncedBuffer {
         self.pages.len() as u32
     }
 
-    pub fn get_current_page_indices(&self) -> Vec<u64> {
-        unimplemented!();
-    }
-
     pub fn get_current_page_insertions(&self) -> Vec<u64> {
-        unimplemented!();
+        Vec::from_iter(self.page_insertions.iter().map(|&x| x))
     }
 
     pub fn get_page_mem_align(&self) -> usize {
@@ -263,7 +292,7 @@ mod file_synced_buffer_tests {
     }
 
     fn rm_tmp(filename: String) {
-        fs::remove_file(filename).unwrap();
+        fs::remove_file(filename).unwrap()
     }
 
     // read() tests
@@ -511,8 +540,52 @@ mod file_synced_buffer_tests {
         );
         assert_eq!(3, b.get_num_current_pages());
     }
+
+    #[test]
+    fn empty_pages_are_not_cached() {
+        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 4, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res = b.read(0, 128).unwrap();
+        assert_eq!(3, b.get_num_current_pages());
+    }
+
+    // truncate() tests
+    #[test]
+    fn truncate_to_0_removes_all_pages() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        b.read(4, 64).unwrap();
+        assert_eq!(5, b.get_num_current_pages());
+        assert_eq!(vec!(0, 1, 2, 3, 4), b.get_current_page_insertions());
+        b.truncate(0);
+        assert_eq!(0, b.get_num_current_pages());
+        assert_eq!(Vec::<u64>::new(), b.get_current_page_insertions());
+    }
+
+    #[test]
+    fn truncate_removes_pages_past_len() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        b.read(4, 64).unwrap();
+        assert_eq!(5, b.get_num_current_pages());
+        assert_eq!(vec!(0, 1, 2, 3, 4), b.get_current_page_insertions());
+        b.truncate(45);
+        assert_eq!(3, b.get_num_current_pages());
+        assert_eq!(vec!(0, 1, 2), b.get_current_page_insertions());
+    }
+
+    #[test]
+    fn truncate_truncates_page_at_len() {
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        assert_eq!(0, b.get_num_current_pages());
+        let res1 = b.read(32, 16).unwrap();
+        assert_eq!(16, res1.len());
+        assert_eq!("ectetur adipisci", str::from_utf8(res1.as_slice()).unwrap());
+        b.truncate(45);
+        let res2 = b.read(32, 16).unwrap();
+        assert_eq!(13, res2.len());
+        assert_eq!("ectetur adipi", str::from_utf8(res2.as_slice()).unwrap());
+    }
     
-
-
 
 }
