@@ -68,25 +68,25 @@ pub trait BinaryStorage {
 
 
     fn r_i8(&mut self, offset: usize) -> Result<i8, Error>;
-    fn r_i16(&self, offset: usize) -> Result<i16, Error>;
-    fn r_i32(&self, offset: usize) -> Result<i32, Error>;
-    fn r_i64(&self, offset: usize) -> Result<i64, Error>;
+    fn r_i16(&mut self, offset: usize) -> Result<i16, Error>;
+    fn r_i32(&mut self, offset: usize) -> Result<i32, Error>;
+    fn r_i64(&mut self, offset: usize) -> Result<i64, Error>;
 
-    fn r_u8(&self, offset: usize) -> Result<u8, Error>;
-    fn r_u16(&self, offset: usize) -> Result<u16, Error>;
-    fn r_u32(&self, offset: usize) -> Result<u32, Error>;
-    fn r_u64(&self, offset: usize) -> Result<u64, Error>;
+    fn r_u8(&mut self, offset: usize) -> Result<u8, Error>;
+    fn r_u16(&mut self, offset: usize) -> Result<u16, Error>;
+    fn r_u32(&mut self, offset: usize) -> Result<u32, Error>;
+    fn r_u64(&mut self, offset: usize) -> Result<u64, Error>;
 
-    fn r_f32(&self, offset: usize) -> Result<f32, Error>;
-    fn r_f64(&self, offset: usize) -> Result<f64, Error>;
+    fn r_f32(&mut self, offset: usize) -> Result<f32, Error>;
+    fn r_f64(&mut self, offset: usize) -> Result<f64, Error>;
 
-    fn r_bool(&self, offset: usize) -> Result<bool, Error>;
+    fn r_bool(&mut self, offset: usize) -> Result<bool, Error>;
 
-    fn r_bytes(&self, offset: usize, len: usize) -> Result<Vec<u8>, Error>;
-    fn r_str(&self, offset: usize, len: usize) -> Result<String, Error>;
+    fn r_bytes(&mut self, offset: usize, len: usize) -> Result<Vec<u8>, Error>;
+    fn r_str(&mut self, offset: usize, len: usize) -> Result<String, Error>;
 
     fn fill(&mut self, start: Option<usize>, end: Option<usize>, val: u8) -> Result<(), Error>;
-    fn is_filled(&self, start: Option<usize>, end: Option<usize>, val: u8) -> Result<bool, Error>;
+    fn is_filled(&mut self, start: Option<usize>, end: Option<usize>, val: u8) -> Result<bool, Error>;
 
     fn get_use_txn_boundary(&self) -> bool;
     fn set_use_txn_boundary(&mut self, val: bool);
@@ -777,7 +777,7 @@ pub mod tests {
     }
 
     // r_i16() tests
-    pub fn r_i16_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_i16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -835,7 +835,7 @@ pub mod tests {
     }
 
     // r_i32() tests
-    pub fn r_i32_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_i32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -893,7 +893,7 @@ pub mod tests {
     }
 
     // r_i64() tests
-    pub fn r_i64_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_i64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -951,7 +951,7 @@ pub mod tests {
     }
 
     // r_u8() tests
-    pub fn r_u8_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_u8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1009,7 +1009,7 @@ pub mod tests {
     }
 
     // r_u16() tests
-    pub fn r_u16_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_u16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1067,7 +1067,7 @@ pub mod tests {
     }
 
     // r_u32() tests
-    pub fn r_u32_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_u32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1125,7 +1125,7 @@ pub mod tests {
     }
 
     // r_u64() tests
-    pub fn r_u64_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_u64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1183,7 +1183,7 @@ pub mod tests {
     }
 
     // r_f32() tests
-    pub fn r_f32_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_f32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1241,7 +1241,7 @@ pub mod tests {
     }
 
     // r_f64() tests
-    pub fn r_f64_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_f64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1299,7 +1299,7 @@ pub mod tests {
     }
 
     // r_bool() tests
-    pub fn r_bool_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_bool_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1357,7 +1357,7 @@ pub mod tests {
     }
 
     // r_bytes() tests
-    pub fn r_bytes_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_bytes_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1415,7 +1415,7 @@ pub mod tests {
     }
 
     // r_str() tests
-    pub fn r_str_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_str_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1587,7 +1587,7 @@ pub mod tests {
     }
 
     // is_filled() tests
-    pub fn is_filled_retuns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn is_filled_retuns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
