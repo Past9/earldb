@@ -40,7 +40,7 @@ impl MemoryBinaryStorage {
         let origin = unsafe { heap::allocate(initial_capacity, align) as *mut u8 };
 
         if origin.is_null() { 
-            return Err(Error::Memory(MemoryError::new(binary_storage::ERR_MEM_ALLOC)));
+            return Err(Error::Memory(MemoryError::new(binary_storage::ERR_STORAGE_ALLOC)));
         }
 
         unsafe { ptr::write_bytes::<u8>(origin, 0x0, initial_capacity) };
@@ -203,7 +203,7 @@ impl BinaryStorage for MemoryBinaryStorage {
     }
 
 
-    fn r_i8(&self, offset: usize) -> Result<i8, Error> { self.read(offset) }
+    fn r_i8(&mut self, offset: usize) -> Result<i8, Error> { self.read(offset) }
     fn r_i16(&self, offset: usize) -> Result<i16, Error> { self.read(offset) }
     fn r_i32(&self, offset: usize) -> Result<i32, Error> { self.read(offset) }
     fn r_i64(&self, offset: usize) -> Result<i64, Error> { self.read(offset) }
@@ -371,8 +371,8 @@ impl BinaryStorage for MemoryBinaryStorage {
         let expand_increments = (min_capacity as f64 / self.expand_size as f64).ceil() as usize;
         let new_capacity = match expand_increments.checked_mul(self.expand_size) {
             Some(x) => x,
-            None => return Err(Error::Memory(
-                MemoryError::new(binary_storage::ERR_ARITHMETIC_OVERFLOW)
+            None => return Err(Error::Assertion(
+                AssertionError::new(binary_storage::ERR_ARITHMETIC_OVERFLOW)
             ))
         };
 
@@ -391,7 +391,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         };
 
         if ptr.is_null() {
-            return Err(Error::Memory(MemoryError::new(binary_storage::ERR_MEM_ALLOC)));
+            return Err(Error::Assertion(AssertionError::new(binary_storage::ERR_STORAGE_ALLOC)));
         } else {
             // Set the new capacity and pointer, remembering the old capacity
             let old_capacity = self.capacity;

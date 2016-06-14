@@ -7,6 +7,7 @@ authors = ["Past9 <past9sys@gmail.com>"]
 debug = true
 
 [dependencies]
+byteorder = "0.5.3"
 
 [dependencies.uuid]
 version = "0.2.2"

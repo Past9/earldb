@@ -1,7 +1,7 @@
 use error::{ Error };
 
-pub static ERR_MEM_ALLOC: &'static str = 
-    "Memory allocation failed";
+pub static ERR_STORAGE_ALLOC: &'static str = 
+    "Storage allocation failed";
 pub static ERR_ARITHMETIC_OVERFLOW: &'static str = 
     "Operation failed due to arithmetic overflow";
 pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str = 
@@ -67,7 +67,7 @@ pub trait BinaryStorage {
     fn w_str(&mut self, offset: usize, data: &str) -> Result<(), Error>;
 
 
-    fn r_i8(&self, offset: usize) -> Result<i8, Error>;
+    fn r_i8(&mut self, offset: usize) -> Result<i8, Error>;
     fn r_i16(&self, offset: usize) -> Result<i16, Error>;
     fn r_i32(&self, offset: usize) -> Result<i32, Error>;
     fn r_i64(&self, offset: usize) -> Result<i64, Error>;
@@ -718,7 +718,7 @@ pub mod tests {
     }
 
     // r_i8() tests
-    pub fn r_i8_returns_err_when_closed<T: BinaryStorage>(s: T) {
+    pub fn r_i8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
         assert!(!s.is_open());
         assert_eq!(
             binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -728,6 +728,7 @@ pub mod tests {
 
     pub fn r_i8_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
         s.open().unwrap();
+        s.r_i8(0).unwrap();
         assert!(s.r_i8(0).is_ok());
     }
 
@@ -740,8 +741,8 @@ pub mod tests {
         s.open().unwrap();
         s.w_i8(0, i8::max_value()).unwrap();
         assert_eq!(i8::max_value(), s.r_i8(0).unwrap());
-        s.w_i8(32, i8::max_value()).unwrap();
-        assert_eq!(i8::max_value(), s.r_i8(32).unwrap());
+        s.w_i8(32, i8::min_value()).unwrap();
+        assert_eq!(i8::min_value(), s.r_i8(32).unwrap());
     }
 
     pub fn r_i8_does_not_read_past_txn_boundary<T: BinaryStorage>(mut s: T) {
@@ -1901,7 +1902,7 @@ pub mod tests {
     pub fn expand_returns_err_when_allocation_fails<T: BinaryStorage>(mut s: T) {
         s.open().unwrap();
         assert_eq!(
-            binary_storage::ERR_MEM_ALLOC,
+            binary_storage::ERR_STORAGE_ALLOC,
             s.expand((usize::max_value() - 1024) as usize).unwrap_err().description()
         );
     }

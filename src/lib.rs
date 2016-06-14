@@ -4,6 +4,7 @@ extern crate alloc;
 extern crate core;
 
 extern crate uuid;
+extern crate byteorder;
 
 mod storage;
 mod error;

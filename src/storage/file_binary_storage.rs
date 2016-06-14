@@ -1,66 +1,207 @@
-use storage::binary_storage::BinaryStorage;
-use error::{ Error };
+use std::fs::{ File, OpenOptions };
+use std::path::Path;
+use std::mem;
+use std::io::{ Cursor, Write, Seek, SeekFrom };
 
+use byteorder::{ BigEndian, LittleEndian, ReadBytesExt };
+
+use storage::binary_storage;
+use storage::binary_storage::BinaryStorage;
+use storage::file_synced_buffer::FileSyncedBuffer;
+use error::{ Error, AssertionError };
+
+
+pub static ERR_NO_FILE: &'static str = 
+    "File has not been opened";
 
 pub struct FileBinaryStorage {
-
+    path: String,
+    create: bool,
+    file: Option<File>,
+    buffer: Option<FileSyncedBuffer>,
+    buffer_page_size: u32,
+    buffer_max_pages: u32,
+    is_open: bool,
+    initial_capacity: usize,
+    capacity: usize,
+    expand_size: usize,
+    use_txn_boundary: bool,
+    txn_boundary: usize
 }
 impl FileBinaryStorage {
 
-    fn write<T>(&mut self, offset: usize, data: T) -> Result<(), Error> {
-        unimplemented!();
+    pub fn new(
+        path: String,
+        create: bool,
+        initial_capacity: usize,
+        buffer_page_size: u32,
+        buffer_max_pages: u32,
+        expand_size: usize,
+        use_txn_boundary: bool
+    ) -> FileBinaryStorage {
+        FileBinaryStorage {
+            path: path,
+            create: create,
+            file: None,
+            buffer: None,
+            buffer_page_size: buffer_page_size,
+            buffer_max_pages: buffer_max_pages,
+            is_open: false,
+            initial_capacity: initial_capacity,
+            capacity: 0,
+            expand_size: expand_size,
+            use_txn_boundary: use_txn_boundary,
+            txn_boundary: 0
+        }
     }
 
-    fn read<T: Copy>(&self, offset: usize) -> Result<T, Error> {
-        unimplemented!();
+    fn write<T>(&mut self, offset: usize, data: &[u8]) -> Result<(), Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+        try!(AssertionError::assert_not(
+            self.use_txn_boundary && offset < self.txn_boundary,
+            binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
+        ));
+        try!(self.expand(offset + mem::size_of::<T>()));
+
+        {
+            let mut file = try!(self.file());
+            try!(file.seek(SeekFrom::Start(offset as u64)));
+            try!(file.write(data)); 
+        }
+
+        let mut buffer = try!(self.buffer());
+
+        buffer.update(offset as u64, data);
+
+        Ok(())
     }
+
+    fn read<T: Copy>(&mut self, offset: usize) -> Result<Vec<u8>, Error> {
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+        try!(AssertionError::assert_not(
+            self.use_txn_boundary && (offset + mem::size_of::<T>()) > self.txn_boundary,
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
+        ));
+        try!(AssertionError::assert(
+            offset + mem::size_of::<T>() <= self.capacity, 
+            binary_storage::ERR_READ_PAST_END
+        ));
+
+        let buffer = try!(self.buffer());
+        Ok(try!(buffer.read(offset as u64, mem::size_of::<T>())))
+    }
+
+    fn file(&self) -> Result<&File, AssertionError> {
+        match self.file {
+            Some(ref f) => Ok(f),
+            None => Err(AssertionError::new(ERR_NO_FILE))
+        }
+    }
+
+    fn buffer(&mut self) -> Result<&mut FileSyncedBuffer, AssertionError> {
+        match self.buffer {
+            Some(ref mut b) => Ok(b),
+            None => Err(AssertionError::new(ERR_NO_FILE))
+        }
+    }
+
 }
 impl BinaryStorage for FileBinaryStorage {
 
     fn open(&mut self) -> Result<(), Error> {
-        unimplemented!();
+        try!(AssertionError::assert_not(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_OPEN));
+
+        let preexisting = Path::new(self.path.as_str()).exists();
+
+        let write_file = try!(
+            OpenOptions::new()
+                .write(true)
+                .create(self.create)
+                .open(self.path.clone())
+        );
+
+        if !preexisting && self.create {
+            try!(write_file.set_len(self.initial_capacity as u64));
+            try!(write_file.sync_all());
+        }
+
+        self.capacity = try!(write_file.metadata()).len() as usize;
+
+        let read_file = try!(
+            OpenOptions::new()
+                .read(true)
+                .open(self.path.clone())
+        );
+
+        let buffer = FileSyncedBuffer::new(
+            read_file, 
+            self.buffer_page_size, 
+            self.buffer_max_pages, 
+            8
+        );
+
+        self.file = Some(write_file);
+        self.buffer = Some(buffer);
+
+        self.is_open = true;
+        Ok(())
     }
 
     fn close(&mut self) -> Result<(), Error> {
-        unimplemented!();
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+
+        self.file = None;
+        self.buffer = None;
+
+        self.is_open = false;
+        Ok(())
     }
 
-    fn w_i8(&mut self, offset: usize, data: i8) -> Result<(), Error> { self.write(offset, data) }
-    fn w_i16(&mut self, offset: usize, data: i16) -> Result<(), Error> { self.write(offset, data) }
-    fn w_i32(&mut self, offset: usize, data: i32) -> Result<(), Error> { self.write(offset, data) }
-    fn w_i64(&mut self, offset: usize, data: i64) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i8(&mut self, offset: usize, data: i8) -> Result<(), Error> { 
+        self.write::<i8>(offset, vec!(data as u8).as_slice())
 
-    fn w_u8(&mut self, offset: usize, data: u8) -> Result<(), Error> { self.write(offset, data) }
-    fn w_u16(&mut self, offset: usize, data: u16) -> Result<(), Error> { self.write(offset, data) }
-    fn w_u32(&mut self, offset: usize, data: u32) -> Result<(), Error> { self.write(offset, data) }
-    fn w_u64(&mut self, offset: usize, data: u64) -> Result<(), Error> { self.write(offset, data) }
+    }
 
-    fn w_f32(&mut self, offset: usize, data: f32) -> Result<(), Error> { self.write(offset, data) }
-    fn w_f64(&mut self, offset: usize, data: f64) -> Result<(), Error> { self.write(offset, data) }
+    fn w_i16(&mut self, offset: usize, data: i16) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+    fn w_i32(&mut self, offset: usize, data: i32) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+    fn w_i64(&mut self, offset: usize, data: i64) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
 
-    fn w_bool(&mut self, offset: usize, data: bool) -> Result<(), Error> { self.write(offset, data) }
+    fn w_u8(&mut self, offset: usize, data: u8) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+    fn w_u16(&mut self, offset: usize, data: u16) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+    fn w_u32(&mut self, offset: usize, data: u32) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+    fn w_u64(&mut self, offset: usize, data: u64) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+
+    fn w_f32(&mut self, offset: usize, data: f32) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+    fn w_f64(&mut self, offset: usize, data: f64) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
+
+    fn w_bool(&mut self, offset: usize, data: bool) -> Result<(), Error> { unimplemented!(); /*self.write(offset, data)*/ }
 
     fn w_bytes(&mut self, offset: usize, data: &[u8]) -> Result<(), Error> {
         unimplemented!();
     }
 
-    fn w_str(&mut self, offset: usize, data: &str) -> Result<(), Error> { self.w_bytes(offset, data.as_bytes()) }
+    fn w_str(&mut self, offset: usize, data: &str) -> Result<(), Error> { 
+        self.w_bytes(offset, data.as_bytes()) 
+    }
 
 
-    fn r_i8(&self, offset: usize) -> Result<i8, Error> { self.read(offset) }
-    fn r_i16(&self, offset: usize) -> Result<i16, Error> { self.read(offset) }
-    fn r_i32(&self, offset: usize) -> Result<i32, Error> { self.read(offset) }
-    fn r_i64(&self, offset: usize) -> Result<i64, Error> { self.read(offset) }
+    fn r_i8(&mut self, offset: usize) -> Result<i8, Error> { 
+        Ok(*(try!(self.read::<i8>(offset)).first().unwrap()) as i8)
+    }
 
-    fn r_u8(&self, offset: usize) -> Result<u8, Error> { self.read(offset) }
-    fn r_u16(&self, offset: usize) -> Result<u16, Error> { self.read(offset) }
-    fn r_u32(&self, offset: usize) -> Result<u32, Error> { self.read(offset) }
-    fn r_u64(&self, offset: usize) -> Result<u64, Error> { self.read(offset) }
+    fn r_i16(&self, offset: usize) -> Result<i16, Error> { unimplemented!(); /*self.read(offset)*/ }
+    fn r_i32(&self, offset: usize) -> Result<i32, Error> { unimplemented!(); /*self.read(offset)*/ }
+    fn r_i64(&self, offset: usize) -> Result<i64, Error> { unimplemented!(); /*self.read(offset)*/ }
 
-    fn r_f32(&self, offset: usize) -> Result<f32, Error> { self.read(offset) }
-    fn r_f64(&self, offset: usize) -> Result<f64, Error> { self.read(offset) }
+    fn r_u8(&self, offset: usize) -> Result<u8, Error> { unimplemented!(); /*self.read(offset)*/ }
+    fn r_u16(&self, offset: usize) -> Result<u16, Error> { unimplemented!(); /*self.read(offset)*/ }
+    fn r_u32(&self, offset: usize) -> Result<u32, Error> { unimplemented!(); /*self.read(offset)*/ }
+    fn r_u64(&self, offset: usize) -> Result<u64, Error> { unimplemented!(); /*self.read(offset)*/ }
 
-    fn r_bool(&self, offset: usize) -> Result<bool, Error> { self.read(offset) }
+    fn r_f32(&self, offset: usize) -> Result<f32, Error> { unimplemented!(); /*self.read(offset)*/ }
+    fn r_f64(&self, offset: usize) -> Result<f64, Error> { unimplemented!(); /*self.read(offset)*/ }
+
+    fn r_bool(&self, offset: usize) -> Result<bool, Error> { unimplemented!(); /*self.read(offset)*/ }
 
     fn r_bytes(&self, offset: usize, len: usize) -> Result<Vec<u8>, Error> {
         unimplemented!();
@@ -81,20 +222,37 @@ impl BinaryStorage for FileBinaryStorage {
 
 
     fn get_use_txn_boundary(&self) -> bool {
-        unimplemented!();
+        self.use_txn_boundary
     }
 
     fn set_use_txn_boundary(&mut self, val: bool) {
-        unimplemented!();
+        self.use_txn_boundary = val;
+        if !val { self.txn_boundary = 0 }
     }
 
 
     fn get_txn_boundary(&self) -> Result<usize, Error> {
-        unimplemented!();
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+        try!(AssertionError::assert(
+            self.use_txn_boundary, 
+            binary_storage::ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY
+        ));
+        Ok(self.txn_boundary)
     }
 
     fn set_txn_boundary(&mut self, offset: usize) -> Result<(), Error> {
-        unimplemented!();
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+        try!(AssertionError::assert(
+            self.use_txn_boundary, 
+            binary_storage::ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY
+        ));
+        try!(AssertionError::assert(
+            offset <= self.capacity, 
+            binary_storage::ERR_SET_TXN_BOUNDARY_PAST_END
+        ));
+
+        self.txn_boundary = offset;
+        Ok(())
     }
 
 
@@ -108,15 +266,37 @@ impl BinaryStorage for FileBinaryStorage {
 
 
     fn expand(&mut self, min_capacity: usize) -> Result<(), Error> {
-        unimplemented!();
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+
+        // Determine the new size of the journal in multiples of expand_size
+        let expand_increments = (min_capacity as f64 / self.expand_size as f64).ceil() as usize;
+        let new_capacity = match expand_increments.checked_mul(self.expand_size) {
+            Some(x) => x,
+            None => return Err(Error::Assertion(
+                AssertionError::new(binary_storage::ERR_ARITHMETIC_OVERFLOW)
+            ))
+        };
+
+        // We don't want to reallocate (or even reduce the capacity) if we already have enough,
+        // so just do nothing and return Ok if we already have enough room
+        if new_capacity <= self.capacity { return Ok(()) }
+
+        // Allocate more disk space
+        try!(self.file()).set_len(new_capacity as u64);
+
+        // Set the new capacity 
+        self.capacity = new_capacity;
+        // Return Ok to indicate that allocation was successful
+        Ok(())
     }
 
     fn get_capacity(&self) -> Result<usize, Error> {
-        unimplemented!();
+        try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
+        Ok(self.capacity)
     }
 
     fn is_open(&self) -> bool {
-        unimplemented!();
+        self.is_open
     }
 
 }
@@ -125,12 +305,36 @@ impl BinaryStorage for FileBinaryStorage {
 #[cfg(test)]
 mod file_binary_storage_tests {
 
+    use std::fs;
+    use uuid::{ Uuid, UuidVersion };
+
     use storage::binary_storage::tests;
     use storage::binary_storage::BinaryStorage;
     use storage::file_binary_storage::FileBinaryStorage;
 
+
+    pub static BASE_PATH: &'static str = "./test_data/storage/file_binary_storage/";
+
+    fn rnd_path() -> String {
+        BASE_PATH.to_string() 
+            + Uuid::new_v4().simple().to_string().as_str()
+            + ".tmp"
+    }
+
+    fn rm_tmp(filename: String) {
+        fs::remove_file(filename).unwrap()
+    }
+
     fn get_storage() -> FileBinaryStorage {
-        unimplemented!();
+        FileBinaryStorage::new(
+            rnd_path(),
+            true,
+            256,
+            16, 
+            16,
+            256,
+            false
+        )
     }
 
 

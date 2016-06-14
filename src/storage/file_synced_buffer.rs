@@ -243,11 +243,8 @@ impl FileSyncedBuffer {
 #[cfg(test)]
 mod file_synced_buffer_tests {
 
-    use std::thread;
-    use std::time::Duration;
     use std::str;
     use std::fs;
-    use std::panic;
     use std::fs::{ File, OpenOptions };
     use std::io::{ Read, Write };
 
