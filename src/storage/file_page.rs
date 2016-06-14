@@ -75,7 +75,8 @@ impl FilePage {
         let dest = unsafe { slice::from_raw_parts_mut(self.ptr_mut(offset), trunc_len) };
         dest.clone_from_slice(&data[0..trunc_len]);
 
-        self.actual_size = end_offset as u32;
+        let new_size = end_offset as u32;
+        if new_size > self.actual_size { self.actual_size = new_size }
     }
 
     pub fn read(&self, offset: u32, len: u32) -> Vec<u8> {
@@ -307,6 +308,16 @@ mod file_page_tests {
         assert_eq!(4, p.get_actual_size());
         p.write(100, &[0x1, 0x2, 0x3, 0x4]);
         assert_eq!(104, p.get_actual_size());
+    }
+
+    #[test]
+    fn actual_size_only_increases() {
+        let mut p = FilePage::new(256, 128).unwrap();
+        assert_eq!(0, p.get_actual_size());
+        p.write(0, &[0x1, 0x2, 0x3, 0x4]);
+        assert_eq!(4, p.get_actual_size());
+        p.write(0, &[0x3, 0x4]);
+        assert_eq!(4, p.get_actual_size());
     }
 
     // FilePage::get_align() tests
