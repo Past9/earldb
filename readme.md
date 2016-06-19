@@ -1,5 +1,6 @@
 # EarlDB
 
+[![Build Status](https://api.travis-ci.org/Past9/earldb.svg)](https://travis-ci.org/Past9/earldb)
 
 
 [![Coverage
