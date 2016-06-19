@@ -122,7 +122,6 @@ impl Drop for MemoryJournal {
 }
 */
 
-
 /*
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,3 @@
-/*
 #![feature(alloc, heap_api)]
 
 extern crate alloc;
@@ -28,4 +27,3 @@ pub trait Journal {
     fn capacity(&self) -> usize;
 
 }
-*/
