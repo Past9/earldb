@@ -546,6 +546,8 @@ impl BinaryStorage for FileBinaryStorage {
 mod file_binary_storage_tests {
 
     use std::fs;
+    use std::fs::{ File, OpenOptions };
+    use std::path::Path;
     use uuid::{ Uuid, UuidVersion };
 
     use storage::binary_storage::tests;
@@ -596,6 +598,70 @@ mod file_binary_storage_tests {
         tests::open_returns_err_when_already_open(
             get_storage()
         );
+    }
+
+    #[test]
+    pub fn open_creates_file_when_allowed_and_file_does_not_exist() {
+        let path = rnd_path();
+        assert!(!Path::new(path.clone().as_str()).exists());
+        let mut s = FileBinaryStorage::new(
+            path.clone(),
+            true,
+            256,
+            16, 
+            16,
+            512,
+            false
+        ).unwrap();
+        assert!(!Path::new(path.clone().as_str()).exists());
+        s.open();
+        assert!(Path::new(path.clone().as_str()).exists());
+        s.close();
+        assert!(Path::new(path.clone().as_str()).exists());
+        rm_tmp(path);
+    }
+
+    #[test]
+    pub fn open_creates_file_with_initial_capacity() {
+        let path = rnd_path();
+        let mut s = FileBinaryStorage::new(
+            path.clone(),
+            true,
+            256,
+            16, 
+            16,
+            512,
+            false
+        ).unwrap();
+        s.open();
+        s.close();
+        let f = OpenOptions::new()
+            .read(true)
+            .write(false)
+            .create(false)
+            .open(path.clone()).unwrap();
+        assert_eq!(256, f.metadata().unwrap().len());
+        rm_tmp(path);
+    }
+
+    #[test]
+    pub fn open_does_not_create_file_when_not_allowed_and_file_does_not_exist() {
+        let path = rnd_path();
+        assert!(!Path::new(path.clone().as_str()).exists());
+        let mut s = FileBinaryStorage::new(
+            path.clone(),
+            false,
+            256,
+            16, 
+            16,
+            512,
+            true
+        ).unwrap();
+        assert!(!Path::new(path.clone().as_str()).exists());
+        s.open();
+        assert!(!Path::new(path.clone().as_str()).exists());
+        s.close();
+        assert!(!Path::new(path.clone().as_str()).exists());
     }
 
     #[test]

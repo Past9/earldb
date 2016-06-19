@@ -8,18 +8,12 @@ pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str =
     "Expansion size must be greater that zero";
 pub static ERR_INITIAL_CAP_TOO_SMALL: &'static str = 
     "Initial capacity must be greater than zero";
-pub static ERR_ALIGN_TOO_SMALL: &'static str = 
-    "Alignment must be greater than zero";
 pub static ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2: &'static str = 
     "Max page size must be a power of 2";
-pub static ERR_ALIGN_NOT_POWER_OF_2: &'static str = 
-    "Alignment must be a power of 2";
 pub static ERR_INITIAL_CAP_NOT_POWER_OF_2: &'static str = 
     "Initial capacity must be a power of 2";
 pub static ERR_EXPAND_SIZE_NOT_POWER_OF_2: &'static str = 
     "Expansion size must be a power of 2";
-pub static ERR_ALIGN_LARGER_THAN_PAGE_SIZE: &'static str = 
-    "Alignment must be no larger than max page size";
 pub static ERR_WRITE_BEFORE_TXN_BOUNDARY: & 'static str = 
     "Cannot write before transaction boundary";
 pub static ERR_WRITE_PAST_END: & 'static str = 
