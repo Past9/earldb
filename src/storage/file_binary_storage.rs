@@ -4,7 +4,7 @@ use std::mem;
 use std::io::{ Cursor, Write, Seek, SeekFrom };
 use std::str;
 
-use byteorder::{ BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt };
+use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
 use storage::util;
 use storage::binary_storage;
@@ -172,8 +172,7 @@ impl BinaryStorage for FileBinaryStorage {
         let buffer = FileSyncedBuffer::new(
             read_file, 
             self.buffer_page_size, 
-            self.buffer_max_pages, 
-            8
+            self.buffer_max_pages 
         );
 
         self.file = Some(write_file);
@@ -199,19 +198,19 @@ impl BinaryStorage for FileBinaryStorage {
 
     fn w_i16(&mut self, offset: usize, data: i16) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_i16::<LittleEndian>(data);
+        try!(buf.write_i16::<LittleEndian>(data));
         self.write::<i16>(offset, buf.as_slice())
     }
 
     fn w_i32(&mut self, offset: usize, data: i32) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_i32::<LittleEndian>(data);
+        try!(buf.write_i32::<LittleEndian>(data));
         self.write::<i32>(offset, buf.as_slice())
     }
 
     fn w_i64(&mut self, offset: usize, data: i64) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_i64::<LittleEndian>(data);
+        try!(buf.write_i64::<LittleEndian>(data));
         self.write::<i64>(offset, buf.as_slice())
     }
 
@@ -221,31 +220,31 @@ impl BinaryStorage for FileBinaryStorage {
 
     fn w_u16(&mut self, offset: usize, data: u16) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_u16::<LittleEndian>(data);
+        try!(buf.write_u16::<LittleEndian>(data));
         self.write::<u16>(offset, buf.as_slice())
     }
 
     fn w_u32(&mut self, offset: usize, data: u32) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_u32::<LittleEndian>(data);
+        try!(buf.write_u32::<LittleEndian>(data));
         self.write::<u32>(offset, buf.as_slice())
     }
 
     fn w_u64(&mut self, offset: usize, data: u64) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_u64::<LittleEndian>(data);
+        try!(buf.write_u64::<LittleEndian>(data));
         self.write::<u64>(offset, buf.as_slice())
     }
 
     fn w_f32(&mut self, offset: usize, data: f32) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_f32::<LittleEndian>(data);
+        try!(buf.write_f32::<LittleEndian>(data));
         self.write::<f32>(offset, buf.as_slice())
     }
 
     fn w_f64(&mut self, offset: usize, data: f64) -> Result<(), Error> { 
         let mut buf = vec![];
-        buf.write_f64::<LittleEndian>(data);
+        try!(buf.write_f64::<LittleEndian>(data));
         self.write::<f64>(offset, buf.as_slice())
     }
 
@@ -513,7 +512,7 @@ impl BinaryStorage for FileBinaryStorage {
 
         // Allocate more disk space
         {
-            let mut file = try!(self.file());
+            let file = try!(self.file());
             match file.set_len(new_capacity as u64) {
                 Ok(()) => {},
                 Err(_) => {
@@ -546,10 +545,11 @@ impl BinaryStorage for FileBinaryStorage {
 mod file_binary_storage_tests {
 
     use std::fs;
-    use std::fs::{ File, OpenOptions };
+    use std::fs::OpenOptions;
     use std::path::Path;
-    use uuid::{ Uuid, UuidVersion };
+    use uuid::Uuid;
 
+    use error::Error;
     use storage::binary_storage::tests;
     use storage::binary_storage::BinaryStorage;
     use storage::file_binary_storage::FileBinaryStorage;
@@ -614,9 +614,9 @@ mod file_binary_storage_tests {
             false
         ).unwrap();
         assert!(!Path::new(path.clone().as_str()).exists());
-        s.open();
+        s.open().unwrap();
         assert!(Path::new(path.clone().as_str()).exists());
-        s.close();
+        s.close().unwrap();
         assert!(Path::new(path.clone().as_str()).exists());
         rm_tmp(path);
     }
@@ -633,8 +633,8 @@ mod file_binary_storage_tests {
             512,
             false
         ).unwrap();
-        s.open();
-        s.close();
+        s.open().unwrap();
+        s.close().unwrap();
         let f = OpenOptions::new()
             .read(true)
             .write(false)
@@ -642,6 +642,44 @@ mod file_binary_storage_tests {
             .open(path.clone()).unwrap();
         assert_eq!(256, f.metadata().unwrap().len());
         rm_tmp(path);
+    }
+
+    #[test]
+    pub fn open_returns_io_err_when_file_does_not_exist_and_creation_not_allowed() {
+        let path = rnd_path();
+        assert!(!Path::new(path.clone().as_str()).exists());
+        let mut s = FileBinaryStorage::new(
+            path.clone(),
+            false,
+            256,
+            16, 
+            16,
+            512,
+            true
+        ).unwrap();
+        assert!(
+            match s.open().unwrap_err() {
+                Error::Io(_) => true,
+                _ => false
+            }
+        );
+    }
+
+    #[test]
+    pub fn open_does_not_open_when_file_does_not_exist_and_creation_not_allowed() {
+        let path = rnd_path();
+        assert!(!Path::new(path.clone().as_str()).exists());
+        let mut s = FileBinaryStorage::new(
+            path.clone(),
+            false,
+            256,
+            16, 
+            16,
+            512,
+            true
+        ).unwrap();
+        s.open().unwrap_err();
+        assert!(!s.is_open());
     }
 
     #[test]
@@ -658,9 +696,8 @@ mod file_binary_storage_tests {
             true
         ).unwrap();
         assert!(!Path::new(path.clone().as_str()).exists());
-        s.open();
+        s.open().unwrap_err();
         assert!(!Path::new(path.clone().as_str()).exists());
-        s.close();
         assert!(!Path::new(path.clone().as_str()).exists());
     }
 

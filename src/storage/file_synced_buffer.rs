@@ -1,17 +1,10 @@
-#![feature(alloc, heap_api)]
-
 extern crate alloc;
 extern crate core;
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::iter::FromIterator;
-use std::str;
-use std::cmp;
-use alloc::heap;
-use std::{mem, ptr, slice};
 use std::collections::{ HashMap, VecDeque };
-use storage::util;
 
 use error::{ Error };
 use storage::file_page::FilePage;
@@ -21,7 +14,6 @@ pub struct FileSyncedBuffer {
     file: File,
     page_size: u32,
     max_pages: u32,
-    page_mem_align: usize,
     pages: HashMap<u64, FilePage>,
     page_insertions: VecDeque<u64>
 }
@@ -31,13 +23,11 @@ impl FileSyncedBuffer {
         file: File,
         page_size: u32,
         max_pages: u32,
-        page_mem_align: usize
     ) -> FileSyncedBuffer {
         FileSyncedBuffer {
             file: file,
             page_size: page_size,
             max_pages: max_pages,
-            page_mem_align: page_mem_align,
             pages: HashMap::new(),
             page_insertions: VecDeque::new()
         }
@@ -47,8 +37,8 @@ impl FileSyncedBuffer {
     fn calc_page_range(&self, offset: u64, length: usize) -> (u64, u64) {
         let page_size = self.page_size as u64;
         let len = length as u64;
-        let mut start = offset / page_size; 
-        let mut end = (offset + len - 1) / page_size;
+        let start = offset / page_size; 
+        let end = (offset + len - 1) / page_size;
         (start as u64, end as u64)
     }
 
@@ -126,7 +116,7 @@ impl FileSyncedBuffer {
         let read_len = try!(self.file.read(buf.as_mut_slice()));
         buf.truncate(read_len);
 
-        let mut page = FilePage::new(self.page_size, self.page_mem_align).unwrap();
+        let mut page = FilePage::new(self.page_size).unwrap();
         page.write(0, buf.as_slice());
         let data = page.read(start, len);
 
@@ -232,10 +222,6 @@ impl FileSyncedBuffer {
         Vec::from_iter(self.page_insertions.iter().map(|&x| x))
     }
 
-    pub fn get_page_mem_align(&self) -> usize {
-        self.page_mem_align
-    }
-
 }
 
 
@@ -246,12 +232,11 @@ mod file_synced_buffer_tests {
     use std::str;
     use std::fs;
     use std::fs::{ File, OpenOptions };
-    use std::io::{ Read, Write };
+    use std::io::Write;
 
-    use uuid::{ Uuid, UuidVersion };
+    use uuid::Uuid;
 
     use storage::file_synced_buffer::FileSyncedBuffer;
-    use error::Error;
 
 
     pub static BASE_PATH: &'static str = "./test_data/storage/file_synced_buffer/";
@@ -291,19 +276,19 @@ mod file_synced_buffer_tests {
     // read() tests
     #[test]
     fn read_returns_empty_on_blank_file() {
-        let mut b = FileSyncedBuffer::new(file_r("blank.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("blank.txt"), 16, 16);
         assert_eq!(0, b.read(0, 128).unwrap().len());
     }
 
     #[test]
     fn read_returns_empty_when_reading_from_past_eof() {
-        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 16, 16);
         assert_eq!(0, b.read(10, 10).unwrap().len());
     }
 
     #[test]
     fn read_only_returns_data_present_in_file() {
-        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 4, 4, 1);
+        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 4, 4);
         let res = b.read(0, 100).unwrap();
         assert_eq!(10, res.len());
         assert_eq!("Lorem ips\n", str::from_utf8(res.as_slice()).unwrap());
@@ -311,13 +296,13 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn read_truncates_data_when_reading_past_eof() {
-        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 16, 16);
         assert_eq!(10, b.read(0, 16).unwrap().len());
     }
 
     #[test]
     fn read_reads_data_in_single_page() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         let res = b.read(35, 10).unwrap();
         assert_eq!(10, res.len());
         assert_eq!("etur adipi", str::from_utf8(res.as_slice()).unwrap());
@@ -325,7 +310,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn read_reads_data_across_page_boundaries() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         let res = b.read(25, 10).unwrap();
         assert_eq!(10, res.len());
         assert_eq!("t, consect", str::from_utf8(res.as_slice()).unwrap());
@@ -333,7 +318,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn read_reads_data_across_multiple_page_boundaries() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         let res = b.read(40, 35).unwrap();
         assert_eq!(35, res.len());
         assert_eq!("adipiscing elit. Integer ut imperdi", str::from_utf8(res.as_slice()).unwrap());
@@ -345,7 +330,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x1, 0x2, 0x3, 0x4]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4), b.read(0, 4).unwrap());
         b.update(1, &[0x5, 0x6]); 
         assert_eq!(vec!(0x1, 0x5, 0x6, 0x4), b.read(0, 4).unwrap());
@@ -358,7 +343,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4), b.read(4, 4).unwrap());
         b.update(5, &[0x5, 0x6]); 
         assert_eq!(vec!(0x1, 0x5, 0x6, 0x4), b.read(4, 4).unwrap());
@@ -371,7 +356,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x1, 0x2, 0x3, 0x4]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4), b.read(0, 4).unwrap());
         b.update(0, &[0x5, 0x6, 0x7, 0x8]); 
         assert_eq!(vec!(0x5, 0x6, 0x7, 0x8), b.read(0, 4).unwrap());
@@ -384,7 +369,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4), b.read(4, 4).unwrap());
         b.update(4, &[0x5, 0x6, 0x7, 0x8]); 
         assert_eq!(vec!(0x5, 0x6, 0x7, 0x8), b.read(4, 4).unwrap());
@@ -397,7 +382,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x0, 0x0, 0x1, 0x2, 0x3, 0x4]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4), b.read(2, 4).unwrap());
         b.update(2, &[0x5, 0x6, 0x7, 0x8]); 
         assert_eq!(vec!(0x5, 0x6, 0x7, 0x8), b.read(2, 4).unwrap());
@@ -410,7 +395,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4), b.read(6, 4).unwrap());
         b.update(6, &[0x5, 0x6, 0x7, 0x8]); 
         assert_eq!(vec!(0x5, 0x6, 0x7, 0x8), b.read(6, 4).unwrap());
@@ -423,7 +408,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8), b.read(6, 8).unwrap());
         b.update(6, &[0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1]); 
         assert_eq!(vec!(0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1), b.read(6, 8).unwrap());
@@ -436,7 +421,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8), b.read(6, 8).unwrap());
         b.update(6, &[0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1]); 
         assert_eq!(vec!(0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1), b.read(6, 8).unwrap());
@@ -449,7 +434,7 @@ mod file_synced_buffer_tests {
         let (mut f, p) = file_tmp_rw();
 
         f.write(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]).unwrap();
-        let mut b = FileSyncedBuffer::new(f, 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(f, 4, 16);
         assert_eq!(vec!(0x0, 0x0, 0x1, 0x2), b.read(4, 4).unwrap());
         assert_eq!(vec!(0x7, 0x8), b.read(12, 4).unwrap());
         b.update(6, &[0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1]); 
@@ -463,7 +448,7 @@ mod file_synced_buffer_tests {
     // truncate() tests
     #[test]
     fn truncate_to_0_removes_all_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         assert_eq!(0, b.get_num_current_pages());
         b.read(4, 64).unwrap();
         assert_eq!(5, b.get_num_current_pages());
@@ -475,7 +460,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn truncate_removes_pages_past_len() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         assert_eq!(0, b.get_num_current_pages());
         b.read(4, 64).unwrap();
         assert_eq!(5, b.get_num_current_pages());
@@ -487,7 +472,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn truncate_truncates_page_at_len() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         assert_eq!(0, b.get_num_current_pages());
         let res1 = b.read(32, 16).unwrap();
         assert_eq!(16, res1.len());
@@ -501,20 +486,20 @@ mod file_synced_buffer_tests {
     // get_page_size() tests
     #[test]
     fn get_page_size_returns_initialized_page_size() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 1);
+        let b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64);
         assert_eq!(32, b.get_page_size());
     }
 
     // get_max_pages() and set_max_pages() tests
     #[test]
     fn get_max_pages_returns_initialized_max_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 1);
+        let b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64);
         assert_eq!(64, b.get_max_pages());
     }
 
     #[test]
     fn get_max_pages_returns_max_pages_after_set_max_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64);
         b.set_max_pages(20);
         assert_eq!(20, b.get_max_pages());
         b.set_max_pages(0);
@@ -523,7 +508,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn set_max_pages_removes_oldest_pages_when_reduced() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4);
         assert_eq!(0, b.get_num_current_pages());
         b.read(0, 64).unwrap();
         assert_eq!(vec!(0, 1, 2, 3), b.get_current_page_insertions());
@@ -533,7 +518,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn set_max_pages_allows_more_pages_when_increased() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 2, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 2);
         assert_eq!(0, b.get_num_current_pages());
         b.read(0, 64).unwrap();
         assert_eq!(vec!(2, 3), b.get_current_page_insertions());
@@ -545,13 +530,13 @@ mod file_synced_buffer_tests {
     // get_num_current_pages() tests
     #[test]
     fn get_num_current_pages_starts_at_0() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         assert_eq!(0, b.get_num_current_pages());
     }
 
     #[test]
     fn get_num_current_pages_increases_as_pages_are_read() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         b.read(0, 16).unwrap();
         assert_eq!(1, b.get_num_current_pages());
         b.read(16, 16).unwrap();
@@ -562,7 +547,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn get_num_current_pages_does_not_return_more_than_max_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4);
         b.read(0, 16).unwrap();
         assert_eq!(1, b.get_num_current_pages());
         b.read(16, 16).unwrap();
@@ -578,13 +563,13 @@ mod file_synced_buffer_tests {
     // get_current_page_insertions() tests
     #[test]
     fn get_current_page_insertions_starts_empty() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        let b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4);
         assert_eq!(0, b.get_current_page_insertions().len());
     }
 
     #[test]
     fn get_current_page_insertions_adds_pages_in_order_of_insertion() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4);
         b.read(16, 16).unwrap();
         assert_eq!(vec!(1), b.get_current_page_insertions());
         b.read(48, 16).unwrap();
@@ -595,7 +580,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn get_current_page_insertions_shows_oldest_pages_removed_first() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 4);
         b.read(16, 16).unwrap();
         assert_eq!(vec!(1), b.get_current_page_insertions());
         b.read(48, 16).unwrap();
@@ -610,18 +595,10 @@ mod file_synced_buffer_tests {
         assert_eq!(vec!(0, 2, 4, 6), b.get_current_page_insertions());
     }
 
-    // get_page_mem_align() tests
-    #[test]
-    #[test]
-    fn get_page_mem_align_returns_initialized_page_mem_align() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 32, 64, 4);
-        assert_eq!(4, b.get_page_mem_align());
-    }
-
     // page caching tests
     #[test]
     fn reads_1_page_when_caching_0_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 0, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 0);
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(4, 4).unwrap();
         assert_eq!(4, res.len());
@@ -631,7 +608,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn reads_multiple_pages_when_caching_0_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 0, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 0);
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(4, 32).unwrap();
         assert_eq!(32, res.len());
@@ -641,7 +618,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn reads_1_page_when_caching_1_page() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 1, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 1);
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(4, 4).unwrap();
         assert_eq!(4, res.len());
@@ -651,7 +628,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn reads_multiple_pages_when_caching_1_page() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 1, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 1);
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(4, 32).unwrap();
         assert_eq!(32, res.len());
@@ -661,7 +638,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn reads_1_page_when_caching_multiple_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(4, 4).unwrap();
         assert_eq!(4, res.len());
@@ -671,7 +648,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn reads_multiple_pages_when_caching_multiple_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(4, 32).unwrap();
         assert_eq!(32, res.len());
@@ -681,7 +658,7 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn only_caches_up_to_max_pages() {
-        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 3, 1);
+        let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 3);
         assert_eq!(0, b.get_num_current_pages());
         let res = b.read(4, 64).unwrap();
         assert_eq!(64, res.len());
@@ -694,9 +671,9 @@ mod file_synced_buffer_tests {
 
     #[test]
     fn empty_pages_are_not_cached() {
-        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 4, 16, 1);
+        let mut b = FileSyncedBuffer::new(file_r("10.txt"), 4, 16);
         assert_eq!(0, b.get_num_current_pages());
-        let res = b.read(0, 128).unwrap();
+        b.read(0, 128).unwrap();
         assert_eq!(3, b.get_num_current_pages());
     }
     
