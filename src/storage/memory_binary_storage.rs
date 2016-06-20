@@ -7,30 +7,6 @@ use error::{ Error, MemoryError, AssertionError };
 use storage::binary_storage;
 use storage::binary_storage::BinaryStorage;
 
-
-mod safe_calc {
-
-    use error::{ Error, AssertionError };
-    use storage::binary_storage;
-
-    pub fn u64_as_usize(n: u64) -> Result<usize, AssertionError> {
-        try!(AssertionError::assert_not(
-            n > usize::max_value() as u64, 
-            binary_storage::ERR_ARITHMETIC_OVERFLOW
-        ));
-        Ok(n as usize)
-    }
-
-    pub fn usize_add(a: usize, b: usize) -> Result<usize, AssertionError> {
-        match a.checked_add(b) {
-            Some(n) => Ok(n),
-            None => Err(AssertionError::new(binary_storage::ERR_ARITHMETIC_OVERFLOW))
-        }
-    }
-
-}
-
-
 #[derive(Debug)]
 pub struct MemoryBinaryStorage {
     origin: *const u8,
@@ -56,7 +32,7 @@ impl MemoryBinaryStorage {
 
         let align = mem::size_of::<usize>();
 
-        let c_capacity = try!(safe_calc::u64_as_usize(initial_capacity));
+        let c_capacity = try!(util::u64_as_usize(initial_capacity));
 
         let origin = unsafe { heap::allocate(c_capacity, align) };
 
@@ -89,13 +65,13 @@ impl MemoryBinaryStorage {
     fn write<T>(&mut self, offset: u64, data: T) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let c_capacity = try!(safe_calc::u64_as_usize(self.capacity));
-        let c_offset = try!(safe_calc::u64_as_usize(offset));
-        let end_offset = try!(safe_calc::usize_add(c_offset, mem::size_of::<T>()));
-        try!(safe_calc::usize_add(self.origin as usize, end_offset));
+        let c_capacity = try!(util::u64_as_usize(self.capacity));
+        let c_offset = try!(util::u64_as_usize(offset));
+        let end_offset = try!(util::usize_add(c_offset, mem::size_of::<T>()));
+        try!(util::usize_add(self.origin as usize, end_offset));
 
         if self.use_txn_boundary {
-            let c_boundary = try!(safe_calc::u64_as_usize(self.txn_boundary));
+            let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
                 c_offset < c_boundary, 
                 binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
@@ -110,15 +86,15 @@ impl MemoryBinaryStorage {
     fn read<T: Copy>(&self, offset: u64) -> Result<T, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let c_capacity = try!(safe_calc::u64_as_usize(self.capacity));
-        let c_offset = try!(safe_calc::u64_as_usize(offset));
-        let end_offset = try!(safe_calc::usize_add(c_offset, mem::size_of::<T>()));
-        try!(safe_calc::usize_add(self.origin as usize, end_offset));
+        let c_capacity = try!(util::u64_as_usize(self.capacity));
+        let c_offset = try!(util::u64_as_usize(offset));
+        let end_offset = try!(util::usize_add(c_offset, mem::size_of::<T>()));
+        try!(util::usize_add(self.origin as usize, end_offset));
 
         try!(AssertionError::assert_not(end_offset > c_capacity, binary_storage::ERR_READ_PAST_END));
 
         if self.use_txn_boundary {
-            let c_boundary = try!(safe_calc::u64_as_usize(self.txn_boundary));
+            let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
                 end_offset > c_boundary, 
                 binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
@@ -190,13 +166,13 @@ impl BinaryStorage for MemoryBinaryStorage {
     fn w_bytes(&mut self, offset: u64, data: &[u8]) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let c_capacity = try!(safe_calc::u64_as_usize(self.capacity));
-        let c_offset = try!(safe_calc::u64_as_usize(offset));
-        let end_offset = try!(safe_calc::usize_add(c_offset, data.len()));
-        try!(safe_calc::usize_add(self.origin as usize, end_offset));
+        let c_capacity = try!(util::u64_as_usize(self.capacity));
+        let c_offset = try!(util::u64_as_usize(offset));
+        let end_offset = try!(util::usize_add(c_offset, data.len()));
+        try!(util::usize_add(self.origin as usize, end_offset));
 
         if self.use_txn_boundary {
-            let c_boundary = try!(safe_calc::u64_as_usize(self.txn_boundary));
+            let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
                 c_offset < c_boundary, 
                 binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
@@ -233,15 +209,15 @@ impl BinaryStorage for MemoryBinaryStorage {
     fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let c_capacity = try!(safe_calc::u64_as_usize(self.capacity));
-        let c_offset = try!(safe_calc::u64_as_usize(offset));
-        let end_offset = try!(safe_calc::usize_add(c_offset, len));
-        try!(safe_calc::usize_add(self.origin as usize, end_offset));
+        let c_capacity = try!(util::u64_as_usize(self.capacity));
+        let c_offset = try!(util::u64_as_usize(offset));
+        let end_offset = try!(util::usize_add(c_offset, len));
+        try!(util::usize_add(self.origin as usize, end_offset));
 
         try!(AssertionError::assert_not(end_offset > c_capacity, binary_storage::ERR_READ_PAST_END));
 
         if self.use_txn_boundary {
-            let c_boundary = try!(safe_calc::u64_as_usize(self.txn_boundary));
+            let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
                 end_offset > c_boundary, 
                 binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
@@ -263,14 +239,14 @@ impl BinaryStorage for MemoryBinaryStorage {
     fn fill(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let start_offset = try!(safe_calc::u64_as_usize(
+        let start_offset = try!(util::u64_as_usize(
             match start { Some(s) => s, None => 0 }
         ));
-        let end_offset = try!(safe_calc::u64_as_usize(
+        let end_offset = try!(util::u64_as_usize(
             match end { Some(e) => e, None => self.capacity }
         ));
 
-        let c_capacity = try!(safe_calc::u64_as_usize(self.capacity));
+        let c_capacity = try!(util::u64_as_usize(self.capacity));
 
         try!(AssertionError::assert(
             start_offset < c_capacity, 
@@ -288,7 +264,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         ));
 
         if self.use_txn_boundary {
-            let c_boundary = try!(safe_calc::u64_as_usize(self.txn_boundary));
+            let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
                 start_offset < c_boundary, 
                 binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
@@ -302,14 +278,14 @@ impl BinaryStorage for MemoryBinaryStorage {
     fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let start_offset = try!(safe_calc::u64_as_usize(
+        let start_offset = try!(util::u64_as_usize(
             match start { Some(s) => s, None => 0 }
         ));
-        let end_offset = try!(safe_calc::u64_as_usize(
+        let end_offset = try!(util::u64_as_usize(
             match end { Some(e) => e, None => self.capacity }
         ));
 
-        let c_capacity = try!(safe_calc::u64_as_usize(self.capacity));
+        let c_capacity = try!(util::u64_as_usize(self.capacity));
 
         try!(AssertionError::assert(
             start_offset < c_capacity, 
@@ -400,8 +376,8 @@ impl BinaryStorage for MemoryBinaryStorage {
             ))
         };
 
-        let c_capacity = try!(safe_calc::u64_as_usize(self.capacity));
-        let c_new_capacity = try!(safe_calc::u64_as_usize(new_capacity));
+        let c_capacity = try!(util::u64_as_usize(self.capacity));
+        let c_new_capacity = try!(util::u64_as_usize(new_capacity));
 
         // We don't want to reallocate (or even reduce the capacity) if we already have enough,
         // so just do nothing and return Ok if we already have enough room
