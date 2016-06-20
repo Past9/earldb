@@ -44,7 +44,7 @@ impl FilePage {
         max_size: u32
     ) -> bool {
         // Max size must be a power of 2 
-        if !util::is_power_of_two(max_size as usize) { return false }
+        if !(max_size as usize).is_power_of_two() { return false }
         // If all checks pass, return true
         true
     }

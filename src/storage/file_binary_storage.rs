@@ -37,10 +37,10 @@ impl FileBinaryStorage {
     pub fn new(
         path: String,
         create: bool,
-        initial_capacity: usize,
+        initial_capacity: u64,
         buffer_page_size: u32,
         buffer_max_pages: u32,
-        expand_size: usize,
+        expand_size: u64,
         use_txn_boundary: bool
     ) -> Result<FileBinaryStorage, Error> {
 
@@ -65,20 +65,13 @@ impl FileBinaryStorage {
         })
     }
 
-    fn assert_no_usize_overflow(val: u64, msg: &str) -> Result<(), AssertionError> {
-        if val > (usize::max_value() as u64) {
-            Err(AssertionError::new(msg))
-        }
-        Ok(())
-    }
-
     fn write<T>(&mut self, offset: u64, data: &[u8]) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
             self.use_txn_boundary && offset < self.txn_boundary,
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
         ));
-        try!(self.expand(offset + mem::size_of::<T>()));
+        try!(self.expand(offset + mem::size_of::<T>() as u64));
 
         {
             let mut file = try!(self.file());
@@ -96,11 +89,11 @@ impl FileBinaryStorage {
     fn read<T: Copy>(&mut self, offset: u64) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
-            self.use_txn_boundary && (offset + mem::size_of::<T>()) > self.txn_boundary,
+            self.use_txn_boundary && (offset + mem::size_of::<T>() as u64) > self.txn_boundary,
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
         ));
         try!(AssertionError::assert(
-            offset + mem::size_of::<T>() <= self.capacity, 
+            offset + mem::size_of::<T>() as u64 <= self.capacity, 
             binary_storage::ERR_READ_PAST_END
         ));
 
@@ -138,12 +131,12 @@ impl FileBinaryStorage {
         ));
         // Initial capacity must be a power of 2
         try!(AssertionError::assert(
-            util::is_power_of_two(initial_capacity), 
+            initial_capacity.is_power_of_two(), 
             binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2
         ));
         // Expansion size must be a power of 2
         try!(AssertionError::assert(
-            util::is_power_of_two(expand_size), 
+            expand_size.is_power_of_two(), 
             binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2
         ));
         // If all checks pass, return true
@@ -170,7 +163,7 @@ impl BinaryStorage for FileBinaryStorage {
             try!(write_file.sync_all());
         }
 
-        self.capacity = try!(write_file.metadata()).len() as usize;
+        self.capacity = try!(write_file.metadata()).len();
 
         let read_file = try!(
             OpenOptions::new()
@@ -267,7 +260,7 @@ impl BinaryStorage for FileBinaryStorage {
             self.use_txn_boundary && offset < self.txn_boundary,
             binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
         ));
-        try!(self.expand(offset + data.len()));
+        try!(self.expand(offset + data.len() as u64));
 
         {
             let mut file = try!(self.file());
@@ -353,11 +346,11 @@ impl BinaryStorage for FileBinaryStorage {
     fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
-            self.use_txn_boundary && (offset + len) > self.txn_boundary,
+            self.use_txn_boundary && (offset + len as u64) > self.txn_boundary,
             binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
         ));
         try!(AssertionError::assert(
-            offset + len <= self.capacity, 
+            offset + (len as u64) <= self.capacity, 
             binary_storage::ERR_READ_PAST_END
         ));
 
@@ -444,7 +437,8 @@ impl BinaryStorage for FileBinaryStorage {
 
         let buffer = try!(self.buffer());
         let len = end_offset - start_offset;
-        try!(MemoryBinaryStorage::assert_no_usize_overflow(len, ERR_READ_LEN_TOO_LARGE));
+
+
         let data = try!(buffer.read(start_offset as u64, len as usize));
 
         for b in data.as_slice() {
@@ -592,7 +586,7 @@ mod file_binary_storage_tests {
         (s, path)
     }
 
-    fn get_storage_expand_size(expand_size: usize) -> (FileBinaryStorage, String) {
+    fn get_storage_expand_size(expand_size: u64) -> (FileBinaryStorage, String) {
         let path = rnd_path();
         let s = FileBinaryStorage::new(
             path.clone(),

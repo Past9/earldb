@@ -79,11 +79,11 @@ impl MemoryBinaryStorage {
     }
 
     fn ptr<T>(&self, offset: usize) -> *const T {
-        (self.origin as usize * offset) as *const T
+        (self.origin as usize + offset) as *const T
     }
 
     fn ptr_mut<T>(&mut self, offset: usize) -> *mut T {
-        (self.origin as usize * offset) as *mut T
+        (self.origin as usize + offset) as *mut T
     }
 
     fn write<T>(&mut self, offset: u64, data: T) -> Result<(), Error> {
@@ -93,8 +93,6 @@ impl MemoryBinaryStorage {
         let c_offset = try!(safe_calc::u64_as_usize(offset));
         let end_offset = try!(safe_calc::usize_add(c_offset, mem::size_of::<T>()));
         try!(safe_calc::usize_add(self.origin as usize, end_offset));
-
-        try!(AssertionError::assert_not(end_offset > c_capacity, binary_storage::ERR_WRITE_PAST_END));
 
         if self.use_txn_boundary {
             let c_boundary = try!(safe_calc::u64_as_usize(self.txn_boundary));
@@ -197,8 +195,6 @@ impl BinaryStorage for MemoryBinaryStorage {
         let end_offset = try!(safe_calc::usize_add(c_offset, data.len()));
         try!(safe_calc::usize_add(self.origin as usize, end_offset));
 
-        try!(AssertionError::assert_not(end_offset > c_capacity, binary_storage::ERR_WRITE_PAST_END));
-
         if self.use_txn_boundary {
             let c_boundary = try!(safe_calc::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
@@ -282,7 +278,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         ));
 
         try!(AssertionError::assert(
-            end_offset < c_capacity, 
+            end_offset <= c_capacity, 
             binary_storage::ERR_WRITE_PAST_END
         ));
 
@@ -298,7 +294,7 @@ impl BinaryStorage for MemoryBinaryStorage {
                 binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
             ));
         }
-
+        
         unsafe { ptr::write_bytes::<u8>(self.ptr_mut(start_offset), val, end_offset - start_offset) }
         Ok(())
     }
