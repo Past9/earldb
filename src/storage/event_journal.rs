@@ -55,10 +55,6 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         self.storage.is_open()
     }
 
-    fn reset(&mut self) {
-        self.read_offset = 0;
-    }
-
     fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         // TODO: constrain data size
         try!(AssertionError::assert_not(self.is_writing, ERR_WRITE_IN_PROGRESS));
@@ -131,7 +127,8 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
             }
         };
 
-        unimplemented!();
+        Ok(())
+
     }
 
     fn discard(&mut self) -> Result<(), Error> {
@@ -152,6 +149,95 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         self.is_writing
     }
 
+    fn reset(&mut self) {
+        self.read_offset = 0;
+    }
+
+    fn has_start(&mut self) -> Result<bool, Error> {
+        Ok(
+            0x02 == try!(self.storage.r_u8(self.read_offset)) 
+        )
+    }
+
+    fn has_end(&mut self) -> Result<bool, Error> {
+        let len = try!(self.storage.r_u32(self.read_offset + mem::size_of::<u8>() as u64));
+        Ok(
+            0x03 == try!(self.storage.r_u8(
+                self.read_offset + 
+                    mem::size_of::<u8>() as u64 + 
+                    mem::size_of::<u32>() as u64 + 
+                    len as u64
+            ))
+        )
+    }
+
+    fn read(&mut self) -> Result<Vec<u8>, Error> {
+        let len = try!(self.storage.r_u32(self.read_offset + mem::size_of::<u8>() as u64)) as usize;
+        self.storage.r_bytes(
+            self.read_offset + 
+                mem::size_of::<u8>() as u64 + 
+                mem::size_of::<u32>() as u64,
+            len 
+        )
+    }
+
+    fn jump_to(&mut self, offset: u64, back_on_fail: bool) -> Result<bool, Error> {
+        let old_offset = self.read_offset;
+        self.read_offset = offset;
+
+        match self.has_start() {
+            Ok(v) => {
+                if !v {
+                    self.read_offset = old_offset;
+                    return Ok(v);
+                }
+            },
+            Err(e) => {
+                self.read_offset = old_offset;
+                return Err(e);
+            }
+        };
+
+        match self.has_end() {
+            Ok(v) => {
+                if !v {
+                    self.read_offset = old_offset;
+                    return Ok(v);
+                }
+            },
+            Err(e) => {
+                self.read_offset = old_offset;
+                return Err(e);
+            }
+        };
+
+        Ok(true)
+    }
+
+    fn next(&mut self) -> Result<Option<Vec<u8>>, Error> {
+
+        if !try!(self.has_start()) || !try!(self.has_end()) { return Ok(None) }
+
+        let res = try!(self.read());
+
+        let new_offset = self.read_offset + 
+            mem::size_of::<u8>() as u64 + 
+            mem::size_of::<u32>() as u64 + 
+            res.len() as u64 +
+            mem::size_of::<u8>() as u64;
+
+        try!(self.jump_to(new_offset, false));
+
+        Ok(Some(res))
+    }
+
+    fn read_offset(&self) -> u64 {
+        self.read_offset
+    }
+
+    fn write_offset(&self) -> u64 {
+        self.write_offset
+    }
 
     fn capacity(&self) -> Result<u64, Error> {
         self.storage.get_capacity()
