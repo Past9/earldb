@@ -1,13 +1,3 @@
-/*
-#![feature(alloc, heap_api)]
-
-extern crate alloc;
-extern crate core;
-
-use alloc::heap;
-use std::{mem, ptr, slice};
-use storage::journal::Journal;
-
 
 pub struct JournalReader {
     storage_origin: Option<*const u8>,
@@ -163,7 +153,6 @@ impl Drop for JournalReader {
     }
 
 }
-*/
 
 
 /*

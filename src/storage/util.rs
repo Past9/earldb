@@ -1,7 +1,31 @@
+use error::{ Error, MemoryError, AssertionError };
+use alloc::heap;
 
+
+pub static ERR_ARITHMETIC_OVERFLOW: & 'static str = "Arithmetic overflow";
 
 pub fn is_power_of_two(n: usize) -> bool {
     return (n != 0) && (n & (n - 1)) == 0;
+}
+
+pub fn safe_alloc(size: u64, align: usize) -> Result<*mut u8, Error> {
+    let s = try!(safe_u64_as_usize(size));
+    Ok(
+        unsafe { heap::allocate(s, align) }
+    )
+}
+
+pub fn safe_realloc(ptr: *mut u8, old_size: u64, size: u64, align: usize) -> Result<*mut u8, Error> {
+    let os = try!(safe_u64_as_usize(old_size));
+    let ns = try!(safe_u64_as_usize(size));
+    Ok(
+        unsafe { heap::reallocate(ptr, os, ns, align) }
+    )
+}
+
+pub fn safe_u64_as_usize(n: u64) -> Result<usize, AssertionError> {
+    if n > (usize::max_value() as u64) { return Err(AssertionError::new(ERR_ARITHMETIC_OVERFLOW)) }
+    Ok(n as usize) 
 }
 
 

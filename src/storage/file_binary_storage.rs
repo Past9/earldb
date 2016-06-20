@@ -15,6 +15,8 @@ use error::{ Error, AssertionError };
 
 pub static ERR_NO_FILE: &'static str = 
     "File has not been opened";
+pub static ERR_READ_LEN_TOO_LARGE: & 'static str = 
+    "Read length is too large";
 
 pub struct FileBinaryStorage {
     path: String,
@@ -24,11 +26,11 @@ pub struct FileBinaryStorage {
     buffer_page_size: u32,
     buffer_max_pages: u32,
     is_open: bool,
-    initial_capacity: usize,
-    capacity: usize,
-    expand_size: usize,
+    initial_capacity: u64,
+    capacity: u64,
+    expand_size: u64,
     use_txn_boundary: bool,
-    txn_boundary: usize
+    txn_boundary: u64
 }
 impl FileBinaryStorage {
 
@@ -63,7 +65,14 @@ impl FileBinaryStorage {
         })
     }
 
-    fn write<T>(&mut self, offset: usize, data: &[u8]) -> Result<(), Error> {
+    fn assert_no_usize_overflow(val: u64, msg: &str) -> Result<(), AssertionError> {
+        if val > (usize::max_value() as u64) {
+            Err(AssertionError::new(msg))
+        }
+        Ok(())
+    }
+
+    fn write<T>(&mut self, offset: u64, data: &[u8]) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
             self.use_txn_boundary && offset < self.txn_boundary,
@@ -84,7 +93,7 @@ impl FileBinaryStorage {
         Ok(())
     }
 
-    fn read<T: Copy>(&mut self, offset: usize) -> Result<Vec<u8>, Error> {
+    fn read<T: Copy>(&mut self, offset: u64) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
             self.use_txn_boundary && (offset + mem::size_of::<T>()) > self.txn_boundary,
@@ -114,8 +123,8 @@ impl FileBinaryStorage {
     }
 
     fn check_params(
-        expand_size: usize,
-        initial_capacity: usize
+        expand_size: u64,
+        initial_capacity: u64
     ) -> Result<(), AssertionError> {
         // Expansion size must be greater than zero
         try!(AssertionError::assert(
@@ -192,67 +201,67 @@ impl BinaryStorage for FileBinaryStorage {
         Ok(())
     }
 
-    fn w_i8(&mut self, offset: usize, data: i8) -> Result<(), Error> { 
+    fn w_i8(&mut self, offset: u64, data: i8) -> Result<(), Error> { 
         self.write::<i8>(offset, vec!(data as u8).as_slice())
     }
 
-    fn w_i16(&mut self, offset: usize, data: i16) -> Result<(), Error> { 
+    fn w_i16(&mut self, offset: u64, data: i16) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_i16::<LittleEndian>(data));
         self.write::<i16>(offset, buf.as_slice())
     }
 
-    fn w_i32(&mut self, offset: usize, data: i32) -> Result<(), Error> { 
+    fn w_i32(&mut self, offset: u64, data: i32) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_i32::<LittleEndian>(data));
         self.write::<i32>(offset, buf.as_slice())
     }
 
-    fn w_i64(&mut self, offset: usize, data: i64) -> Result<(), Error> { 
+    fn w_i64(&mut self, offset: u64, data: i64) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_i64::<LittleEndian>(data));
         self.write::<i64>(offset, buf.as_slice())
     }
 
-    fn w_u8(&mut self, offset: usize, data: u8) -> Result<(), Error> { 
+    fn w_u8(&mut self, offset: u64, data: u8) -> Result<(), Error> { 
         self.write::<u8>(offset, vec!(data).as_slice())
     }
 
-    fn w_u16(&mut self, offset: usize, data: u16) -> Result<(), Error> { 
+    fn w_u16(&mut self, offset: u64, data: u16) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_u16::<LittleEndian>(data));
         self.write::<u16>(offset, buf.as_slice())
     }
 
-    fn w_u32(&mut self, offset: usize, data: u32) -> Result<(), Error> { 
+    fn w_u32(&mut self, offset: u64, data: u32) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_u32::<LittleEndian>(data));
         self.write::<u32>(offset, buf.as_slice())
     }
 
-    fn w_u64(&mut self, offset: usize, data: u64) -> Result<(), Error> { 
+    fn w_u64(&mut self, offset: u64, data: u64) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_u64::<LittleEndian>(data));
         self.write::<u64>(offset, buf.as_slice())
     }
 
-    fn w_f32(&mut self, offset: usize, data: f32) -> Result<(), Error> { 
+    fn w_f32(&mut self, offset: u64, data: f32) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_f32::<LittleEndian>(data));
         self.write::<f32>(offset, buf.as_slice())
     }
 
-    fn w_f64(&mut self, offset: usize, data: f64) -> Result<(), Error> { 
+    fn w_f64(&mut self, offset: u64, data: f64) -> Result<(), Error> { 
         let mut buf = vec![];
         try!(buf.write_f64::<LittleEndian>(data));
         self.write::<f64>(offset, buf.as_slice())
     }
 
-    fn w_bool(&mut self, offset: usize, data: bool) -> Result<(), Error> { 
+    fn w_bool(&mut self, offset: u64, data: bool) -> Result<(), Error> { 
         self.write::<bool>(offset, vec!(data as u8).as_slice())
     }
 
-    fn w_bytes(&mut self, offset: usize, data: &[u8]) -> Result<(), Error> {
+    fn w_bytes(&mut self, offset: u64, data: &[u8]) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
             self.use_txn_boundary && offset < self.txn_boundary,
@@ -272,68 +281,68 @@ impl BinaryStorage for FileBinaryStorage {
         Ok(())
     }
 
-    fn w_str(&mut self, offset: usize, data: &str) -> Result<(), Error> { 
+    fn w_str(&mut self, offset: u64, data: &str) -> Result<(), Error> { 
         self.w_bytes(offset, data.as_bytes()) 
     }
 
 
-    fn r_i8(&mut self, offset: usize) -> Result<i8, Error> { 
+    fn r_i8(&mut self, offset: u64) -> Result<i8, Error> { 
         Ok(*(try!(self.read::<i8>(offset)).first().unwrap()) as i8)
     }
 
-    fn r_i16(&mut self, offset: usize) -> Result<i16, Error> { 
+    fn r_i16(&mut self, offset: u64) -> Result<i16, Error> { 
         let data = try!(self.read::<i16>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_i16::<LittleEndian>()))
     }
 
-    fn r_i32(&mut self, offset: usize) -> Result<i32, Error> { 
+    fn r_i32(&mut self, offset: u64) -> Result<i32, Error> { 
         let data = try!(self.read::<i32>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_i32::<LittleEndian>()))
     }
 
-    fn r_i64(&mut self, offset: usize) -> Result<i64, Error> { 
+    fn r_i64(&mut self, offset: u64) -> Result<i64, Error> { 
         let data = try!(self.read::<i64>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_i64::<LittleEndian>()))
     }
 
-    fn r_u8(&mut self, offset: usize) -> Result<u8, Error> { 
+    fn r_u8(&mut self, offset: u64) -> Result<u8, Error> { 
         Ok(*(try!(self.read::<u8>(offset)).first().unwrap()))
     }
 
-    fn r_u16(&mut self, offset: usize) -> Result<u16, Error> { 
+    fn r_u16(&mut self, offset: u64) -> Result<u16, Error> { 
         let data = try!(self.read::<u16>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_u16::<LittleEndian>()))
     }
 
-    fn r_u32(&mut self, offset: usize) -> Result<u32, Error> { 
+    fn r_u32(&mut self, offset: u64) -> Result<u32, Error> { 
         let data = try!(self.read::<u32>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_u32::<LittleEndian>()))
     }
 
-    fn r_u64(&mut self, offset: usize) -> Result<u64, Error> { 
+    fn r_u64(&mut self, offset: u64) -> Result<u64, Error> { 
         let data = try!(self.read::<u64>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_u64::<LittleEndian>()))
     }
 
-    fn r_f32(&mut self, offset: usize) -> Result<f32, Error> { 
+    fn r_f32(&mut self, offset: u64) -> Result<f32, Error> { 
         let data = try!(self.read::<f32>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_f32::<LittleEndian>()))
     }
 
-    fn r_f64(&mut self, offset: usize) -> Result<f64, Error> { 
+    fn r_f64(&mut self, offset: u64) -> Result<f64, Error> { 
         let data = try!(self.read::<f64>(offset));
         let mut rdr = Cursor::new(data);
         Ok(try!(rdr.read_f64::<LittleEndian>()))
     }
 
-    fn r_bool(&mut self, offset: usize) -> Result<bool, Error> { 
+    fn r_bool(&mut self, offset: u64) -> Result<bool, Error> { 
         let byte = *try!(self.read::<bool>(offset)).first().unwrap();
         match byte {
             0 => Ok(false),
@@ -341,7 +350,7 @@ impl BinaryStorage for FileBinaryStorage {
         }
     }
 
-    fn r_bytes(&mut self, offset: usize, len: usize) -> Result<Vec<u8>, Error> {
+    fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert_not(
             self.use_txn_boundary && (offset + len) > self.txn_boundary,
@@ -357,13 +366,13 @@ impl BinaryStorage for FileBinaryStorage {
         Ok(data)
     }
 
-    fn r_str(&mut self, offset: usize, len: usize) -> Result<String, Error> {
+    fn r_str(&mut self, offset: u64, len: usize) -> Result<String, Error> {
         let b = try!(self.r_bytes(offset, len));
         Ok(try!(str::from_utf8(b.as_slice())).to_string())
     }
 
 
-    fn fill(&mut self, start: Option<usize>, end: Option<usize>, val: u8) -> Result<(), Error> {
+    fn fill(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
         let start_offset = match start { Some(s) => s, None => 0 };
@@ -391,7 +400,7 @@ impl BinaryStorage for FileBinaryStorage {
         ));
 
         let len = end_offset - start_offset;
-        let buf = vec![val; len];
+        let buf = vec![val; len as usize];
 
         {
             let mut file = try!(self.file());
@@ -405,7 +414,7 @@ impl BinaryStorage for FileBinaryStorage {
         Ok(())
     }
 
-    fn is_filled(&mut self, start: Option<usize>, end: Option<usize>, val: u8) -> Result<bool, Error> {
+    fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
         let start_offset = match start {
@@ -434,7 +443,9 @@ impl BinaryStorage for FileBinaryStorage {
         ));
 
         let buffer = try!(self.buffer());
-        let data = try!(buffer.read(start_offset as u64, end_offset - start_offset));
+        let len = end_offset - start_offset;
+        try!(MemoryBinaryStorage::assert_no_usize_overflow(len, ERR_READ_LEN_TOO_LARGE));
+        let data = try!(buffer.read(start_offset as u64, len as usize));
 
         for b in data.as_slice() {
             if *b != val { return Ok(false) }
@@ -454,7 +465,7 @@ impl BinaryStorage for FileBinaryStorage {
     }
 
 
-    fn get_txn_boundary(&self) -> Result<usize, Error> {
+    fn get_txn_boundary(&self) -> Result<u64, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert(
             self.use_txn_boundary, 
@@ -463,7 +474,7 @@ impl BinaryStorage for FileBinaryStorage {
         Ok(self.txn_boundary)
     }
 
-    fn set_txn_boundary(&mut self, offset: usize) -> Result<(), Error> {
+    fn set_txn_boundary(&mut self, offset: u64) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         try!(AssertionError::assert(
             self.use_txn_boundary, 
@@ -479,11 +490,11 @@ impl BinaryStorage for FileBinaryStorage {
     }
 
 
-    fn get_expand_size(&self) -> usize {
+    fn get_expand_size(&self) -> u64 {
         self.expand_size
     }
 
-    fn set_expand_size(&mut self, expand_size: usize) -> Result<(), Error> {
+    fn set_expand_size(&mut self, expand_size: u64) -> Result<(), Error> {
         try!(FileBinaryStorage::check_params(
             expand_size,
             self.initial_capacity
@@ -494,11 +505,11 @@ impl BinaryStorage for FileBinaryStorage {
     }
 
 
-    fn expand(&mut self, min_capacity: usize) -> Result<(), Error> {
+    fn expand(&mut self, min_capacity: u64) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
         // Determine the new size of the journal in multiples of expand_size
-        let expand_increments = (min_capacity as f64 / self.expand_size as f64).ceil() as usize;
+        let expand_increments = (min_capacity as f64 / self.expand_size as f64).ceil() as u64;
         let new_capacity = match expand_increments.checked_mul(self.expand_size) {
             Some(x) => x,
             None => return Err(Error::Assertion(
@@ -529,7 +540,7 @@ impl BinaryStorage for FileBinaryStorage {
         Ok(())
     }
 
-    fn get_capacity(&self) -> Result<usize, Error> {
+    fn get_capacity(&self) -> Result<u64, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
         Ok(self.capacity)
     }

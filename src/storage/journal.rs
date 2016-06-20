@@ -1,29 +1,22 @@
-#![feature(alloc, heap_api)]
-
 extern crate alloc;
 extern crate core;
 
-use alloc::heap;
-use std::{mem, ptr, slice};
-
+use error::Error;
 
 pub trait Journal {
 
-    fn open(&mut self);
-    fn close(&mut self);
+    fn open(&mut self) -> Result<(), Error> ;
+    fn close(&mut self) -> Result<(), Error> ;
     fn is_open(&self) -> bool;
 
-    fn reset(&mut self) -> bool;
+    fn reset(&mut self);
 
-    fn write(&mut self, data: &[u8]) -> bool;
-    fn commit(&mut self) -> bool;
-    fn discard(&mut self) -> bool;
+    fn write(&mut self, data: &[u8]) -> Result<(), Error>;
+    fn commit(&mut self) -> Result<(), Error>;
+    fn discard(&mut self) -> Result<(), Error>;
 
-    //fn next(&mut self) -> bool;
-    fn size(&self) -> u32;
-    //fn read(&self) -> Option<Vec<u8>>;
     fn is_writing(&self) -> bool;
 
-    fn capacity(&self) -> usize;
+    fn capacity(&self) -> Result<u64, Error>;
 
 }
