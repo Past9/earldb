@@ -65,7 +65,6 @@ impl MemoryBinaryStorage {
     fn write<T>(&mut self, offset: u64, data: T) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let c_capacity = try!(util::u64_as_usize(self.capacity));
         let c_offset = try!(util::u64_as_usize(offset));
         let end_offset = try!(util::usize_add(c_offset, mem::size_of::<T>()));
         try!(util::usize_add(self.origin as usize, end_offset));
@@ -166,7 +165,6 @@ impl BinaryStorage for MemoryBinaryStorage {
     fn w_bytes(&mut self, offset: u64, data: &[u8]) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
-        let c_capacity = try!(util::u64_as_usize(self.capacity));
         let c_offset = try!(util::u64_as_usize(offset));
         let end_offset = try!(util::usize_add(c_offset, data.len()));
         try!(util::usize_add(self.origin as usize, end_offset));

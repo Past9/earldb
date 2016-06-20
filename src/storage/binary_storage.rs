@@ -4,14 +4,10 @@ pub static ERR_STORAGE_ALLOC: &'static str =
     "Storage allocation failed";
 pub static ERR_ARITHMETIC_OVERFLOW: &'static str = 
     "Operation failed due to arithmetic overflow";
-pub static ERR_STORAGE_OUT_OF_BOUNDS: &'static str =
-    "Storage address out of bounds";
 pub static ERR_EXPAND_SIZE_TOO_SMALL: &'static str = 
     "Expansion size must be greater that zero";
 pub static ERR_INITIAL_CAP_TOO_SMALL: &'static str = 
     "Initial capacity must be greater than zero";
-pub static ERR_MAX_PAGE_SIZE_NOT_POWER_OF_2: &'static str = 
-    "Max page size must be a power of 2";
 pub static ERR_INITIAL_CAP_NOT_POWER_OF_2: &'static str = 
     "Initial capacity must be a power of 2";
 pub static ERR_EXPAND_SIZE_NOT_POWER_OF_2: &'static str = 
@@ -36,6 +32,7 @@ pub static ERR_WRITE_NOTHING: & 'static str =
     "End of write must be after start of write";
 pub static ERR_READ_NOTHING: & 'static str = 
     "End of read must be after start of read";
+
 
 pub trait BinaryStorage {
 

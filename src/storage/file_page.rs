@@ -4,7 +4,6 @@ extern crate core;
 use std::cmp;
 use alloc::heap;
 use std::{mem, ptr, slice};
-use storage::util;
 
 
 pub struct FilePage {

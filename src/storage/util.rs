@@ -1,4 +1,4 @@
-use error::{ Error, AssertionError };
+use error::AssertionError;
 use storage::binary_storage;
 
 pub fn u64_as_usize(n: u64) -> Result<usize, AssertionError> {

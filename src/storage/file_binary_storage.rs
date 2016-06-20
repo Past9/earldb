@@ -15,8 +15,6 @@ use error::{ Error, AssertionError };
 
 pub static ERR_NO_FILE: &'static str = 
     "File has not been opened";
-pub static ERR_READ_LEN_TOO_LARGE: & 'static str = 
-    "Read length is too large";
 
 pub struct FileBinaryStorage {
     path: String,
@@ -67,38 +65,47 @@ impl FileBinaryStorage {
 
     fn write<T>(&mut self, offset: u64, data: &[u8]) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
-        try!(AssertionError::assert_not(
-            self.use_txn_boundary && offset < self.txn_boundary,
-            binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
-        ));
-        try!(self.expand(offset + mem::size_of::<T>() as u64));
+
+        let end_offset = try!(util::u64_add(offset, mem::size_of::<T>() as u64));
+
+        if self.use_txn_boundary {
+            try!(AssertionError::assert_not(
+                offset < self.txn_boundary, 
+                binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
+            ));
+        }
+
+        try!(self.expand(end_offset));
 
         {
             let mut file = try!(self.file());
-            try!(file.seek(SeekFrom::Start(offset as u64)));
+            try!(file.seek(SeekFrom::Start(offset)));
             try!(file.write(data)); 
         }
 
         let mut buffer = try!(self.buffer());
 
-        buffer.update(offset as u64, data);
+        buffer.update(offset, data);
 
         Ok(())
     }
 
     fn read<T: Copy>(&mut self, offset: u64) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
-        try!(AssertionError::assert_not(
-            self.use_txn_boundary && (offset + mem::size_of::<T>() as u64) > self.txn_boundary,
-            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
-        ));
-        try!(AssertionError::assert(
-            offset + mem::size_of::<T>() as u64 <= self.capacity, 
-            binary_storage::ERR_READ_PAST_END
-        ));
+
+        let end_offset = try!(util::u64_add(offset, mem::size_of::<T>() as u64));
+
+        try!(AssertionError::assert_not(end_offset > self.capacity, binary_storage::ERR_READ_PAST_END));
+
+        if self.use_txn_boundary {
+            try!(AssertionError::assert_not(
+                end_offset > self.txn_boundary, 
+                binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
+            ));
+        }
 
         let buffer = try!(self.buffer());
-        Ok(try!(buffer.read(offset as u64, mem::size_of::<T>())))
+        Ok(try!(buffer.read(offset, mem::size_of::<T>())))
     }
 
     fn file(&self) -> Result<&File, AssertionError> {
@@ -256,11 +263,17 @@ impl BinaryStorage for FileBinaryStorage {
 
     fn w_bytes(&mut self, offset: u64, data: &[u8]) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
-        try!(AssertionError::assert_not(
-            self.use_txn_boundary && offset < self.txn_boundary,
-            binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
-        ));
-        try!(self.expand(offset + data.len() as u64));
+
+        let end_offset = try!(util::u64_add(offset, data.len() as u64));
+
+        if self.use_txn_boundary {
+            try!(AssertionError::assert_not(
+                offset < self.txn_boundary, 
+                binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
+            ));
+        }
+
+        try!(self.expand(end_offset));
 
         {
             let mut file = try!(self.file());
@@ -269,7 +282,7 @@ impl BinaryStorage for FileBinaryStorage {
         }
 
         let mut buffer = try!(self.buffer());
-        buffer.update(offset as u64, data);
+        buffer.update(offset, data);
 
         Ok(())
     }
@@ -345,14 +358,17 @@ impl BinaryStorage for FileBinaryStorage {
 
     fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
-        try!(AssertionError::assert_not(
-            self.use_txn_boundary && (offset + len as u64) > self.txn_boundary,
-            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
-        ));
-        try!(AssertionError::assert(
-            offset + (len as u64) <= self.capacity, 
-            binary_storage::ERR_READ_PAST_END
-        ));
+
+        let end_offset = try!(util::u64_add(offset, len as u64));
+
+        try!(AssertionError::assert_not(end_offset > self.capacity, binary_storage::ERR_READ_PAST_END));
+
+        if self.use_txn_boundary {
+            try!(AssertionError::assert_not(
+                end_offset > self.txn_boundary, 
+                binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
+            ));
+        }
 
         let buffer = try!(self.buffer());
         let data = try!(buffer.read(offset as u64, len));
@@ -369,22 +385,16 @@ impl BinaryStorage for FileBinaryStorage {
         try!(AssertionError::assert(self.is_open, binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED));
 
         let start_offset = match start { Some(s) => s, None => 0 };
+        let end_offset = match end { Some(e) => e, None => self.capacity };
 
         try!(AssertionError::assert(
             start_offset < self.capacity, 
             binary_storage::ERR_WRITE_PAST_END
         ));
 
-        try!(AssertionError::assert_not(
-            self.use_txn_boundary && start_offset < self.txn_boundary,
-            binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
-        ));
-
-        let end_offset = match end { Some(e) => e, None => self.capacity };
-
         try!(AssertionError::assert(
-            end_offset > start_offset,
-            binary_storage::ERR_WRITE_NOTHING
+            start_offset < self.capacity, 
+            binary_storage::ERR_WRITE_PAST_END
         ));
 
         try!(AssertionError::assert(
@@ -392,8 +402,21 @@ impl BinaryStorage for FileBinaryStorage {
             binary_storage::ERR_WRITE_PAST_END
         ));
 
+        try!(AssertionError::assert(
+            end_offset > start_offset,
+            binary_storage::ERR_WRITE_NOTHING
+        ));
+
+        if self.use_txn_boundary {
+            try!(AssertionError::assert_not(
+                start_offset < self.txn_boundary, 
+                binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
+            ));
+        }
+
+
         let len = end_offset - start_offset;
-        let buf = vec![val; len as usize];
+        let buf = vec![val; try!(util::u64_as_usize(len))];
 
         {
             let mut file = try!(self.file());
@@ -402,7 +425,7 @@ impl BinaryStorage for FileBinaryStorage {
         }
 
         let mut buffer = try!(self.buffer());
-        buffer.update(start_offset as u64, buf.as_slice());
+        buffer.update(start_offset, buf.as_slice());
 
         Ok(())
     }
@@ -414,20 +437,14 @@ impl BinaryStorage for FileBinaryStorage {
             Some(s) => s,
             None => 0
         };
-
-        try!(AssertionError::assert(
-            start_offset < self.capacity, 
-            binary_storage::ERR_READ_PAST_END
-        ));
-
         let end_offset = match end {
             Some(e) => e,
             None => self.capacity
         };
 
         try!(AssertionError::assert(
-            end_offset > start_offset,
-            binary_storage::ERR_READ_NOTHING
+            start_offset < self.capacity, 
+            binary_storage::ERR_READ_PAST_END
         ));
 
         try!(AssertionError::assert(
@@ -435,11 +452,15 @@ impl BinaryStorage for FileBinaryStorage {
             binary_storage::ERR_READ_PAST_END
         ));
 
+        try!(AssertionError::assert(
+            end_offset > start_offset,
+            binary_storage::ERR_READ_NOTHING
+        ));
+
         let buffer = try!(self.buffer());
         let len = end_offset - start_offset;
 
-
-        let data = try!(buffer.read(start_offset as u64, len as usize));
+        let data = try!(buffer.read(start_offset, try!(util::u64_as_usize(len))));
 
         for b in data.as_slice() {
             if *b != val { return Ok(false) }
@@ -518,15 +539,13 @@ impl BinaryStorage for FileBinaryStorage {
         // Allocate more disk space
         {
             let file = try!(self.file());
-            match file.set_len(new_capacity as u64) {
+            match file.set_len(new_capacity) {
                 Ok(()) => {},
                 Err(_) => {
                     return Err(Error::Assertion(AssertionError::new(binary_storage::ERR_STORAGE_ALLOC)));
                 }
             };
         }
-
-
 
         // Set the new capacity 
         self.capacity = new_capacity;
