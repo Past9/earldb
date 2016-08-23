@@ -1,15 +1,9 @@
 use std::mem;
 
 use error::{ Error, AssertionError };
+use storage::journal;
 use storage::journal::Journal;
 use storage::binary_storage::BinaryStorage;
-
-pub static ERR_WRITE_IN_PROGRESS: & 'static str =
-    "Cannot perform this operation while an uncommitted write is in progress";
-pub static ERR_WRITE_NOT_IN_PROGRESS: & 'static str =
-    "Cannot perform this operation when no write is in progress";
-pub static ERR_NOTHING_TO_WRITE: & 'static str =
-    "Cannot write 0 bytes";
 
 pub struct EventJournal<T: BinaryStorage + Sized> {
     storage: T,
@@ -50,8 +44,8 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
 
     fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         // TODO: constrain data size
-        try!(AssertionError::assert_not(self.is_writing, ERR_WRITE_IN_PROGRESS));
-        try!(AssertionError::assert(data.len() > 0, ERR_NOTHING_TO_WRITE));
+        try!(AssertionError::assert_not(self.is_writing, journal::ERR_WRITE_IN_PROGRESS));
+        try!(AssertionError::assert(data.len() > 0, journal::ERR_NOTHING_TO_WRITE));
 
         self.is_writing = true;
         let len = data.len();
@@ -95,7 +89,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
     }
 
     fn commit(&mut self) -> Result<(), Error> {
-        try!(AssertionError::assert(self.is_writing, ERR_WRITE_NOT_IN_PROGRESS));
+        try!(AssertionError::assert(self.is_writing, journal::ERR_WRITE_NOT_IN_PROGRESS));
 
         match self.storage.w_u8(self.write_offset, 0x03) {
             Ok(()) =>  {
@@ -124,7 +118,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
     }
 
     fn discard(&mut self) -> Result<(), Error> {
-        try!(AssertionError::assert(self.is_writing, ERR_WRITE_NOT_IN_PROGRESS));
+        try!(AssertionError::assert(self.is_writing, journal::ERR_WRITE_NOT_IN_PROGRESS));
 
         match self.storage.set_txn_boundary(self.write_offset - self.uncommitted_size) {
             Ok(()) => {
@@ -173,7 +167,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         )
     }
 
-    fn jump_to(&mut self, offset: u64, back_on_fail: bool) -> Result<bool, Error> {
+    fn jump_to(&mut self, offset: u64) -> Result<(), Error> {
         let old_offset = self.read_offset;
         self.read_offset = offset;
 
@@ -181,7 +175,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
             Ok(v) => {
                 if !v {
                     self.read_offset = old_offset;
-                    return Ok(v);
+                    return Err(Error::from(AssertionError::new(journal::ERR_NO_COMMITTED_RECORD)));
                 }
             },
             Err(e) => {
@@ -194,7 +188,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
             Ok(v) => {
                 if !v {
                     self.read_offset = old_offset;
-                    return Ok(v);
+                    return Err(Error::from(AssertionError::new(journal::ERR_NO_COMMITTED_RECORD)));
                 }
             },
             Err(e) => {
@@ -203,7 +197,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
             }
         };
 
-        Ok(true)
+        Ok(())
     }
 
     fn next(&mut self) -> Result<Option<Vec<u8>>, Error> {
@@ -218,7 +212,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
             res.len() as u64 +
             mem::size_of::<u8>() as u64;
 
-        try!(self.jump_to(new_offset, false));
+        try!(self.jump_to(new_offset));
 
         Ok(Some(res))
     }
@@ -235,6 +229,10 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         self.storage.get_capacity()
     }
 
+    fn txn_boundary(&self) -> Result<u64, Error> {
+        self.storage.get_txn_boundary()
+    }
+
 }
 
 
@@ -242,6 +240,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
 mod event_journal_tests {
 
     use std::error::Error;
+    use storage::journal;
     use storage::journal::Journal;
     use storage::event_journal;
     use storage::event_journal::EventJournal;
@@ -329,7 +328,7 @@ mod event_journal_tests {
         j.open().unwrap();
         j.write(&[0x0, 0x1, 0x2]).unwrap();
         assert_eq!(
-            event_journal::ERR_WRITE_IN_PROGRESS,
+            journal::ERR_WRITE_IN_PROGRESS,
             j.write(&[0x0, 0x1, 0x2]).unwrap_err().description()
         );
     }
@@ -360,7 +359,7 @@ mod event_journal_tests {
         let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
         j.open().unwrap();
         assert_eq!(
-            event_journal::ERR_WRITE_NOT_IN_PROGRESS,
+            journal::ERR_WRITE_NOT_IN_PROGRESS,
             j.commit().unwrap_err().description()
         );
     }
@@ -398,7 +397,7 @@ mod event_journal_tests {
         let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
         j.open().unwrap();
         assert_eq!(
-            event_journal::ERR_WRITE_NOT_IN_PROGRESS,
+            journal::ERR_WRITE_NOT_IN_PROGRESS,
             j.discard().unwrap_err().description()
         );
     }
@@ -599,7 +598,98 @@ mod event_journal_tests {
     }
 
     // jump_to() tests
-    // TODO: write these
+    #[test]
+    pub fn jump_to_returns_err_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.jump_to(6).unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn jump_to_returns_err_when_past_txn_boundary() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            j.jump_to(6).unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn jump_to_returns_ok_when_at_record_start() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.commit().unwrap();
+        assert!(j.jump_to(9).is_ok());
+    }
+
+    #[test]
+    pub fn jump_to_returns_err_when_not_at_record_start() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(
+            journal::ERR_NO_COMMITTED_RECORD,
+            j.jump_to(8).unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn jump_to_returns_err_when_at_uncommitted_record_start() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            j.jump_to(9).unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn jump_to_does_not_jump_when_err() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.jump_to(9).unwrap_err();
+        assert_eq!(0, j.read_offset());
+    }
+
+    #[test]
+    pub fn jump_to_jumps_when_complete_record() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.commit().unwrap();
+        j.jump_to(9).unwrap();
+        assert_eq!(9, j.read_offset());
+    }
+
+    #[test]
+    pub fn jump_to_allows_record_read_at_jump_location() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.read().unwrap());
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.commit().unwrap();
+        j.jump_to(9).unwrap();
+        assert_eq!(vec!(0x3, 0x4, 0x5), j.read().unwrap());
+    }
 
     // reset() tests
     // TODO: write these
@@ -616,6 +706,8 @@ mod event_journal_tests {
     // capacity() tests
     // TODO: write these
 
+    // txn_boundary() tests
+    // TODO: write these
 
 
 }
