@@ -797,7 +797,35 @@ mod event_journal_tests {
     }
 
     // read_offset() tests
-    // TODO: write these
+    #[test]
+    pub fn read_offset_starts_at_0() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(0, j.read_offset());
+    }
+
+    #[test]
+    pub fn read_offset_moves_on_next() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(0, j.read_offset());
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.next().unwrap());
+        assert_eq!(9, j.read_offset());
+    }
+
+    #[test]
+    pub fn read_offset_retains_position_after_reopening() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.next().unwrap());
+        assert_eq!(9, j.read_offset());
+        j.close().unwrap();
+        j.open().unwrap();
+        assert_eq!(9, j.read_offset());
+    }
 
     // write_offset() tests
     // TODO: write these
