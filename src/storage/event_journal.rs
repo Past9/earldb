@@ -31,6 +31,7 @@ impl<T: BinaryStorage + Sized> EventJournal<T> {
         }
     }
 
+
 }
 impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
 
@@ -242,5 +243,110 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
     fn capacity(&self) -> Result<u64, Error> {
         self.storage.get_capacity()
     }
+
+}
+
+
+#[cfg(test)]
+mod event_journal_tests {
+
+    use std::error::Error;
+    use storage::journal::Journal;
+    use storage::event_journal::EventJournal;
+    use storage::binary_storage;
+    use storage::binary_storage::BinaryStorage;
+    use storage::memory_binary_storage::MemoryBinaryStorage;
+
+    // new() tests
+
+
+    // open(), close(), an is_open() tests
+    #[test]
+    pub fn is_closed_by_default() {
+        let j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert!(!j.is_open());
+    }
+
+    #[test]
+    pub fn close_returns_err_when_already_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.close().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn open_returns_ok_when_previously_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert!(j.open().is_ok());
+    }
+
+    #[test]
+    pub fn open_returns_err_when_previously_open() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_OPEN,
+            j.open().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn close_returns_ok_when_previously_open() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert!(j.close().is_ok());
+    }
+
+    #[test]
+    pub fn is_open_after_open() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert!(j.is_open());
+    }
+
+    #[test]
+    pub fn is_closed_after_open_and_close() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.close().unwrap();
+        assert!(!j.is_open());
+    }
+
+    // write(), commit(), and discard() tests
+    // TODO: write these
+
+    // is_writing() tests
+    // TODO: write these
+
+    // reset() tests
+    // TODO: write these
+
+    // has_start() tests
+    // TODO: write these
+
+    // has_end() tests
+    // TODO: write these
+
+    // read() tests
+    // TODO: write these
+
+    // jump_to() tests
+    // TODO: write these
+
+    // next() tests
+    // TODO: write these
+
+    // read_offset() tests
+    // TODO: write these
+
+    // write_offset() tests
+    // TODO: write these
+
+    // capacity() tests
+    // TODO: write these
+
+
 
 }
