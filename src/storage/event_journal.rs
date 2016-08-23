@@ -692,7 +692,44 @@ mod event_journal_tests {
     }
 
     // reset() tests
-    // TODO: write these
+    #[test]
+    pub fn reset_does_not_change_read_offset_when_already_0() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(0, j.read_offset());
+        j.reset();
+        assert_eq!(0, j.read_offset());
+    }
+
+    #[test]
+    pub fn reset_changes_read_offset_to_0() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(0, j.read_offset());
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.commit().unwrap();
+        j.jump_to(9).unwrap();
+        assert_eq!(9, j.read_offset());
+        j.reset();
+        assert_eq!(0, j.read_offset());
+    }
+
+    #[test]
+    pub fn reset_allows_reading_from_first_record() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.read().unwrap());
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.commit().unwrap();
+        j.jump_to(9).unwrap();
+        assert_eq!(vec!(0x3, 0x4, 0x5), j.read().unwrap());
+        j.reset();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.read().unwrap());
+    }
 
     // next() tests
     // TODO: write these
