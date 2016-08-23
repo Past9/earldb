@@ -195,6 +195,28 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         Ok(())
     }
 
+
+    fn read_offset(&self) -> u64 {
+        self.read_offset
+    }
+
+    fn write_offset(&self) -> u64 {
+        self.write_offset
+    }
+
+    fn capacity(&self) -> Result<u64, Error> {
+        self.storage.get_capacity()
+    }
+
+    fn txn_boundary(&self) -> Result<u64, Error> {
+        self.storage.get_txn_boundary()
+    }
+
+}
+impl<T: BinaryStorage + Sized> Iterator for EventJournal<T> {
+
+    type Item = Vec<u8>;
+
     fn next(&mut self) -> Option<Vec<u8>> {
 
         match self.has_start() {
@@ -225,24 +247,8 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         }
 
     }
-
-    fn read_offset(&self) -> u64 {
-        self.read_offset
-    }
-
-    fn write_offset(&self) -> u64 {
-        self.write_offset
-    }
-
-    fn capacity(&self) -> Result<u64, Error> {
-        self.storage.get_capacity()
-    }
-
-    fn txn_boundary(&self) -> Result<u64, Error> {
-        self.storage.get_txn_boundary()
-    }
-
 }
+
 
 
 #[cfg(test)]
