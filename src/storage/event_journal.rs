@@ -540,12 +540,68 @@ mod event_journal_tests {
     }
 
     // read() tests
+    #[test]
+    pub fn read_returns_err_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.read().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn read_returns_err_when_no_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            j.read().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn read_returns_err_when_uncommitted_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            j.read().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn read_returns_ok_when_committed_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert!(j.read().is_ok());
+    }
+
+    #[test]
+    pub fn read_returns_first_record() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.read().unwrap());
+    }
+
+    #[test]
+    pub fn read_returns_record_multiple_times() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.read().unwrap());
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.read().unwrap());
+    }
+
+    // jump_to() tests
     // TODO: write these
 
     // reset() tests
-    // TODO: write these
-
-    // jump_to() tests
     // TODO: write these
 
     // next() tests
