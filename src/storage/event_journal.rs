@@ -41,15 +41,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
     }
 
     fn close(&mut self) -> Result<(), Error> {
-        match self.storage.close() {
-            Ok(()) => {
-                self.is_writing = false;
-                self.read_offset = 0;
-                self.write_offset = 0;
-                Ok(())
-            },
-            Err(e) => Err(e)
-        }
+        self.storage.close()
     }
 
     fn is_open(&self) -> bool {
@@ -118,7 +110,6 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
 
         match self.storage.set_txn_boundary(self.write_offset) {
             Ok(()) => {
-                self.write_offset = 0;
                 self.uncommitted_size = 0;
                 self.is_writing = false;
             },
@@ -135,7 +126,7 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
     fn discard(&mut self) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_writing, ERR_WRITE_NOT_IN_PROGRESS));
 
-        match self.storage.set_txn_boundary(self.write_offset) {
+        match self.storage.set_txn_boundary(self.write_offset - self.uncommitted_size) {
             Ok(()) => {
                 self.write_offset -= self.uncommitted_size;
                 self.uncommitted_size = 0;
@@ -252,6 +243,7 @@ mod event_journal_tests {
 
     use std::error::Error;
     use storage::journal::Journal;
+    use storage::event_journal;
     use storage::event_journal::EventJournal;
     use storage::binary_storage;
     use storage::binary_storage::BinaryStorage;
@@ -315,7 +307,111 @@ mod event_journal_tests {
     }
 
     // write(), commit(), and discard() tests
-    // TODO: write these
+    #[test]
+    pub fn write_returns_err_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.write(&[0x0, 0x1, 0x2]).unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn write_returns_ok_when_open() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert!(j.write(&[0x0, 0x1, 0x2]).is_ok());
+    }
+
+    #[test]
+    pub fn write_returns_err_when_uncommitted_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(
+            event_journal::ERR_WRITE_IN_PROGRESS,
+            j.write(&[0x0, 0x1, 0x2]).unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn write_returns_ok_after_commit() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert!(j.write(&[0x0, 0x1, 0x2]).is_ok());
+    }
+
+    #[test]
+    pub fn commit_returns_err_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.close().unwrap();
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.commit().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn commit_returns_err_when_no_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(
+            event_journal::ERR_WRITE_NOT_IN_PROGRESS,
+            j.commit().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn commit_returns_ok_when_uncommitted_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert!(j.commit().is_ok());
+    }
+
+    #[test]
+    pub fn discard_returns_err_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.close().unwrap();
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.commit().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn discard_returns_ok_when_uncommitted_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert!(j.discard().is_ok());
+    }
+
+    #[test]
+    pub fn discard_returns_err_when_no_data() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(
+            event_journal::ERR_WRITE_NOT_IN_PROGRESS,
+            j.discard().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn write_returns_ok_after_discard() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.discard().unwrap();
+        assert!(j.write(&[0x0, 0x1, 0x2]).is_ok());
+    }
+
 
     // is_writing() tests
     // TODO: write these
