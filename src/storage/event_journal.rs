@@ -168,18 +168,15 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
     }
 
     fn jump_to(&mut self, offset: u64) -> Result<(), Error> {
-        let old_offset = self.read_offset;
         self.read_offset = offset;
 
         match self.has_start() {
             Ok(v) => {
                 if !v {
-                    self.read_offset = old_offset;
                     return Err(Error::from(AssertionError::new(journal::ERR_NO_COMMITTED_RECORD)));
                 }
             },
             Err(e) => {
-                self.read_offset = old_offset;
                 return Err(e);
             }
         };
@@ -187,12 +184,10 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         match self.has_end() {
             Ok(v) => {
                 if !v {
-                    self.read_offset = old_offset;
                     return Err(Error::from(AssertionError::new(journal::ERR_NO_COMMITTED_RECORD)));
                 }
             },
             Err(e) => {
-                self.read_offset = old_offset;
                 return Err(e);
             }
         };
@@ -200,21 +195,35 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         Ok(())
     }
 
-    fn next(&mut self) -> Result<Option<Vec<u8>>, Error> {
+    fn next(&mut self) -> Option<Vec<u8>> {
 
-        if !try!(self.has_start()) || !try!(self.has_end()) { return Ok(None) }
+        match self.has_start() {
+            Ok(h) => if !h { return None },
+            Err(_) => return None
+        };
 
-        let res = try!(self.read());
+        match self.has_end() {
+            Ok(h) => if !h { return None },
+            Err(_) => return None
+        };
 
-        let new_offset = self.read_offset + 
-            mem::size_of::<u8>() as u64 + 
-            mem::size_of::<u32>() as u64 + 
-            res.len() as u64 +
-            mem::size_of::<u8>() as u64;
+        match self.read() {
+            Ok(v) => {
 
-        try!(self.jump_to(new_offset));
+                let new_offset = self.read_offset + 
+                    mem::size_of::<u8>() as u64 + 
+                    mem::size_of::<u32>() as u64 + 
+                    v.len() as u64 +
+                    mem::size_of::<u8>() as u64;
 
-        Ok(Some(res))
+                self.jump_to(new_offset);
+
+                Some(v)
+
+            },
+            Err(_) => None
+        }
+
     }
 
     fn read_offset(&self) -> u64 {
@@ -656,14 +665,14 @@ mod event_journal_tests {
     }
 
     #[test]
-    pub fn jump_to_does_not_jump_when_err() {
+    pub fn jump_to_still_jumps_when_err() {
         let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
         j.open().unwrap();
         j.write(&[0x0, 0x1, 0x2]).unwrap();
         j.commit().unwrap();
         j.write(&[0x3, 0x4, 0x5]).unwrap();
         j.jump_to(9).unwrap_err();
-        assert_eq!(0, j.read_offset());
+        assert_eq!(9, j.read_offset());
     }
 
     #[test]
@@ -732,7 +741,54 @@ mod event_journal_tests {
     }
 
     // next() tests
-    // TODO: write these
+    #[test]
+    pub fn next_returns_none_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert!(j.next().is_none());
+    }
+
+    #[test]
+    pub fn next_returns_none_when_no_records() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert!(j.next().is_none());
+    }
+
+    #[test]
+    pub fn next_returns_records_in_order() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.next().unwrap());
+        j.write(&[0x3, 0x4, 0x5]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x3, 0x4, 0x5), j.next().unwrap());
+    }
+
+    #[test]
+    pub fn next_returns_none_when_no_more_records_available() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.next().unwrap());
+        assert!(j.next().is_none());
+    }
+
+    #[test]
+    pub fn next_returns_records_as_they_become_available() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x0, 0x1, 0x2), j.next().unwrap());
+        assert!(j.next().is_none());
+        j.write(&[0x4, 0x5, 0x6]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(vec!(0x4, 0x5, 0x6), j.next().unwrap());
+        assert!(j.next().is_none());
+    }
 
     // read_offset() tests
     // TODO: write these

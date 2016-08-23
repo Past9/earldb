@@ -30,7 +30,7 @@ pub trait Journal {
     fn has_end(&mut self) -> Result<bool, Error>;
     fn read(&mut self) -> Result<Vec<u8>, Error>;
     fn jump_to(&mut self, offset: u64) -> Result<(), Error>;
-    fn next(&mut self) -> Result<Option<Vec<u8>>, Error>;
+    fn next(&mut self) -> Option<Vec<u8>>;
 
     fn read_offset(&self) -> u64;
     fn write_offset(&self) -> u64;
