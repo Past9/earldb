@@ -828,7 +828,50 @@ mod event_journal_tests {
     }
 
     // write_offset() tests
-    // TODO: write these
+    #[test]
+    pub fn write_offset_starts_at_0() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(0, j.read_offset());
+    }
+
+    #[test]
+    pub fn write_offset_increases_on_write() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(8, j.write_offset());
+    }
+
+    #[test]
+    pub fn write_offset_increases_on_commit() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(8, j.write_offset());
+        j.commit().unwrap();
+        assert_eq!(9, j.write_offset());
+    }
+
+    #[test]
+    pub fn write_offset_resets_on_discard() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(8, j.write_offset());
+        j.discard().unwrap();
+        assert_eq!(0, j.write_offset());
+    }
+
+    #[test]
+    pub fn write_offset_retains_position_after_reopening() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(8, j.write_offset());
+        j.close().unwrap();
+        j.open().unwrap();
+        assert_eq!(8, j.write_offset());
+    }
 
     // capacity() tests
     // TODO: write these
