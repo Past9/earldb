@@ -414,7 +414,63 @@ mod event_journal_tests {
 
 
     // is_writing() tests
-    // TODO: write these
+    #[test]
+    pub fn is_not_writing_when_new() {
+        let j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert!(!j.is_writing());
+    }
+
+    #[test]
+    pub fn is_not_writing_when_newly_opened() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert!(!j.is_writing());
+    }
+
+    #[test]
+    pub fn is_writing_after_write() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert!(j.is_writing());
+    }
+
+    #[test]
+    pub fn is_still_writing_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.close().unwrap();
+        assert!(j.is_writing());
+    }
+
+    #[test]
+    pub fn is_still_writing_when_reopened() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.close().unwrap();
+        j.open().unwrap();
+        assert!(j.is_writing());
+    }
+
+    #[test]
+    pub fn is_not_writing_after_commit() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert!(!j.is_writing());
+    }
+
+    #[test]
+    pub fn is_not_writing_after_discard() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.discard().unwrap();
+        assert!(!j.is_writing());
+    }
 
     // reset() tests
     // TODO: write these
