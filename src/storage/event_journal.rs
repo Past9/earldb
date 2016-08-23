@@ -511,7 +511,33 @@ mod event_journal_tests {
     }
 
     // has_end() tests
-    // TODO: write these
+    #[test]
+    pub fn has_end_returns_err_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.has_end().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn has_end_returns_err_when_past_txn_boundary() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            j.has_end().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn has_end_returns_true_when_record_is_committed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert!(j.has_end().is_ok());
+    }
 
     // read() tests
     // TODO: write these
