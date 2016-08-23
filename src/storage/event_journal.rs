@@ -472,16 +472,51 @@ mod event_journal_tests {
         assert!(!j.is_writing());
     }
 
-    // reset() tests
-    // TODO: write these
-
     // has_start() tests
-    // TODO: write these
+    #[test]
+    pub fn has_start_returns_err_when_closed() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.has_start().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn has_start_returns_err_when_past_txn_boundary() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(
+            binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+            j.has_start().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn has_start_returns_ok_when_open() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert!(j.has_start().is_ok());
+    }
+
+    #[test]
+    pub fn has_start_returns_true_when_record_exists() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert!(j.has_start().unwrap());
+    }
 
     // has_end() tests
     // TODO: write these
 
     // read() tests
+    // TODO: write these
+
+    // reset() tests
     // TODO: write these
 
     // jump_to() tests
