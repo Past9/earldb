@@ -40,5 +40,7 @@ pub trait Journal {
 
     fn txn_boundary(&self) -> Result<u64, Error>;
 
+    fn record_count(&self) -> u64;
+
 
 }

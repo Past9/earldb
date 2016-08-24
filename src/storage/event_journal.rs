@@ -33,7 +33,6 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
 
     fn open(&mut self) -> Result<(), Error> {
         self.storage.open().and(self.verify())
-        // TODO: Verify data, set txn boundary
     }
 
     fn close(&mut self) -> Result<(), Error> {
@@ -58,6 +57,10 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
 
         // Start at the beginning of storage
         self.reset();
+        
+        // Turn off the transaction boundary checking temporarily since we don't
+        // know where it is yet
+        self.storage.set_use_txn_boundary(false);
 
         // Count all the good committed records
         let mut count = 0;
@@ -66,9 +69,6 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         }
         self.record_count = count;
 
-        // Turn off the transaction boundary temporarily so we can read past it
-        // to check for uncommitted data
-        self.storage.set_use_txn_boundary(false);
 
         // Check to see if the start byte exists. If an error occurs during the check,
         // turn the transaction boundary back on before returning the error
@@ -176,6 +176,8 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
             }
         };
 
+        self.record_count += 1;
+
         Ok(())
 
     }
@@ -275,6 +277,10 @@ impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
         self.storage.get_txn_boundary()
     }
 
+    fn record_count(&self) -> u64 {
+        self.record_count
+    }
+
 }
 impl<T: BinaryStorage + Sized> Iterator for EventJournal<T> {
 
@@ -325,9 +331,15 @@ mod event_journal_tests {
     use storage::memory_binary_storage::MemoryBinaryStorage;
 
     // new() tests
+    #[test]
+    pub fn new_reads_and_writes_from_0_when_empty_storage() {
+        let j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+        assert_eq!(0, j.read_offset());
+        assert_eq!(0, j.write_offset());
+    }
 
 
-    // open(), close(), and is_open() tests
+    // open(), close(), verify(), and is_open() tests
     #[test]
     pub fn is_closed_by_default() {
         let j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
@@ -357,6 +369,67 @@ mod event_journal_tests {
             binary_storage::ERR_OPERATION_INVALID_WHEN_OPEN,
             j.open().unwrap_err().description()
         );
+    }
+
+    #[test]
+    pub fn open_and_verify_counts_existing_records() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+        s.open().unwrap();
+        s.w_bytes(0, &[0x2, 0x03, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x3]).unwrap();
+        s.close().unwrap();
+        let mut j = EventJournal::new(s);
+        j.open().unwrap();
+        assert_eq!(1, j.record_count());
+    }
+
+    #[test]
+    pub fn open_and_verify_does_not_count_uncommitted_records() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+        s.open().unwrap();
+        s.w_bytes(0, &[0x2, 0x03, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x3]).unwrap();
+        s.w_bytes(9, &[0x2, 0x03, 0x0, 0x0, 0x0]).unwrap();
+        s.close().unwrap();
+        let mut j = EventJournal::new(s);
+        j.open().unwrap();
+        assert_eq!(1, j.record_count());
+    }
+
+    #[test]
+    pub fn open_and_verify_recognizes_all_committed_records() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+        s.open().unwrap();
+        s.w_bytes(0, &[0x2, 0x03, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x3]).unwrap();
+        s.close().unwrap();
+        let mut j = EventJournal::new(s);
+        j.open().unwrap();
+        assert!(!j.is_writing());
+    }
+
+    #[test]
+    pub fn open_and_verify_recognizes_uncommitted_record() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+        s.open().unwrap();
+        s.w_bytes(0, &[0x2, 0x03, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x3]).unwrap();
+        s.close().unwrap();
+        let mut j = EventJournal::new(s);
+        j.open().unwrap();
+        assert!(!j.is_writing());
+    }
+
+    #[test]
+    pub fn open_and_verify_allows_record_commit() {
+        let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+        s.open().unwrap();
+        s.w_bytes(0, &[0x2, 0x03, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x3]).unwrap();
+        s.w_bytes(9, &[0x2, 0x03, 0x0, 0x0, 0x0]).unwrap();
+        s.close().unwrap();
+        let mut j = EventJournal::new(s);
+        j.open().unwrap();
+        assert_eq!(1, j.record_count());
+        assert!(j.is_writing());
+        assert!(j.commit().is_ok());
+        assert_eq!(2, j.record_count());
+        assert!(!j.is_writing());
     }
 
     #[test]
@@ -1018,6 +1091,5 @@ mod event_journal_tests {
         j.commit().unwrap();
         assert_eq!(9, j.txn_boundary().unwrap());
     }
-
 
 }
