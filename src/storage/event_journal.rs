@@ -219,12 +219,7 @@ impl<T: BinaryStorage + Sized> Iterator for EventJournal<T> {
 
     fn next(&mut self) -> Option<Vec<u8>> {
 
-        match self.has_start() {
-            Ok(h) => if !h { return None },
-            Err(_) => return None
-        };
-
-        match self.has_end() {
+        match self.has_start().and(self.has_end()) {
             Ok(h) => if !h { return None },
             Err(_) => return None
         };
@@ -238,7 +233,10 @@ impl<T: BinaryStorage + Sized> Iterator for EventJournal<T> {
                     v.len() as u64 +
                     mem::size_of::<u8>() as u64;
 
-                self.jump_to(new_offset);
+                match self.jump_to(new_offset) {
+                    Ok(_) => {},
+                    Err(_) => {}
+                };
 
                 Some(v)
 
@@ -266,7 +264,7 @@ mod event_journal_tests {
     // new() tests
 
 
-    // open(), close(), an is_open() tests
+    // open(), close(), and is_open() tests
     #[test]
     pub fn is_closed_by_default() {
         let j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
@@ -874,10 +872,89 @@ mod event_journal_tests {
     }
 
     // capacity() tests
-    // TODO: write these
+    #[test]
+    pub fn capacity_returns_err_when_closed() {
+        let j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.capacity().unwrap_err().description()
+        );
+    }
 
+    #[test]
+    pub fn capacity_returns_ok_when_open() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        j.open().unwrap();
+        assert!(j.capacity().is_ok());
+    }
+
+    #[test]
+    pub fn capacity_returns_initial_capacity() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(16, j.capacity().unwrap());
+    }
+
+    #[test]
+    pub fn capacity_returns_expanded_capacity() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(16, j.capacity().unwrap());
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(16, j.capacity().unwrap());
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(32, j.capacity().unwrap());
+    }
+    
     // txn_boundary() tests
-    // TODO: write these
+    #[test]
+    pub fn txn_boundary_returns_err_when_closed() {
+        let j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        assert_eq!(
+            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            j.txn_boundary().unwrap_err().description()
+        );
+    }
+
+    #[test]
+    pub fn txn_boundary_starts_at_0() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        j.open().unwrap();
+        assert_eq!(0, j.txn_boundary().unwrap());
+    }
+
+    #[test]
+    pub fn txn_boundary_does_not_advance_on_write() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(0, j.txn_boundary().unwrap());
+    }
+
+    #[test]
+    pub fn txn_boundary_advances_on_commit() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(0, j.txn_boundary().unwrap());
+        j.commit().unwrap();
+        assert_eq!(9, j.txn_boundary().unwrap());
+    }
+
+    #[test]
+    pub fn txn_boundary_does_not_advance_on_discard() {
+        let mut j = EventJournal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+        j.open().unwrap();
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        assert_eq!(0, j.txn_boundary().unwrap());
+        j.discard().unwrap();
+        assert_eq!(0, j.txn_boundary().unwrap());
+        j.write(&[0x0, 0x1, 0x2]).unwrap();
+        j.commit().unwrap();
+        assert_eq!(9, j.txn_boundary().unwrap());
+    }
 
 
 }
