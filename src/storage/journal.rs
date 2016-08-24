@@ -14,9 +14,10 @@ pub static ERR_NO_COMMITTED_RECORD: & 'static str =
 
 pub trait Journal {
 
-    fn open(&mut self) -> Result<(), Error> ;
-    fn close(&mut self) -> Result<(), Error> ;
+    fn open(&mut self) -> Result<(), Error>;
+    fn close(&mut self) -> Result<(), Error>;
     fn is_open(&self) -> bool;
+    fn verify(&mut self) -> Result<(), Error>;
 
 
     fn write(&mut self, data: &[u8]) -> Result<(), Error>;

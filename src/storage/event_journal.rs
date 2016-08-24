@@ -10,7 +10,8 @@ pub struct EventJournal<T: BinaryStorage + Sized> {
     read_offset: u64,
     write_offset: u64,
     is_writing: bool,
-    uncommitted_size: u64
+    uncommitted_size: u64,
+    record_count: u64
 }
 impl<T: BinaryStorage + Sized> EventJournal<T> {
 
@@ -21,7 +22,8 @@ impl<T: BinaryStorage + Sized> EventJournal<T> {
             read_offset: 0,
             write_offset: 0,
             is_writing: false,
-            uncommitted_size: 0
+            uncommitted_size: 0,
+            record_count: 0
         }
     }
 
@@ -30,17 +32,78 @@ impl<T: BinaryStorage + Sized> EventJournal<T> {
 impl<T: BinaryStorage + Sized> Journal for EventJournal<T> {
 
     fn open(&mut self) -> Result<(), Error> {
-        self.storage.open()
+        self.storage.open().and(self.verify())
         // TODO: Verify data, set txn boundary
     }
 
     fn close(&mut self) -> Result<(), Error> {
-        self.storage.close()
+        match self.storage.close() {
+            Ok(_) => {
+                self.read_offset = 0;
+                self.write_offset = 0;
+                self.is_writing = false;
+                self.uncommitted_size = 0;
+                self.record_count = 0;
+                Ok(())
+            },
+            Err(e) => Err(e)
+        }
     }
 
     fn is_open(&self) -> bool {
         self.storage.is_open()
     }
+
+    fn verify(&mut self) -> Result<(), Error> {
+
+        // Start at the beginning of storage
+        self.reset();
+
+        // Count all the good committed records
+        let mut count = 0;
+        for rec in self.into_iter() {
+            count += 1;
+        }
+        self.record_count = count;
+
+        // Turn off the transaction boundary temporarily so we can read past it
+        // to check for uncommitted data
+        self.storage.set_use_txn_boundary(false);
+
+        // Check to see if the start byte exists. If an error occurs during the check,
+        // turn the transaction boundary back on before returning the error
+        let has_start = match self.has_start() {
+            Ok(h) => h,
+            Err(e) => {
+                self.storage.set_use_txn_boundary(true);
+                return Err(e);
+            }
+        };
+
+        if has_start {
+            let data = match self.read() {
+                Ok(d) => d,
+                Err(e) => {
+                    self.storage.set_use_txn_boundary(true);
+                    return Err(e);
+                }
+            };
+            self.write_offset = self.read_offset + 
+                mem::size_of::<u8>() as u64 + 
+                mem::size_of::<u32>() as u64 + 
+                data.len() as u64;
+            self.is_writing = true;
+        }
+
+        self.storage.set_use_txn_boundary(true);
+
+
+        // Reset to the beginning and return Ok
+        self.reset();
+        Ok(())
+        
+    }
+
 
     fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         // TODO: constrain data size
@@ -362,7 +425,7 @@ mod event_journal_tests {
         j.write(&[0x0, 0x1, 0x2]).unwrap();
         j.close().unwrap();
         assert_eq!(
-            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            journal::ERR_WRITE_NOT_IN_PROGRESS,
             j.commit().unwrap_err().description()
         );
     }
@@ -392,7 +455,7 @@ mod event_journal_tests {
         j.write(&[0x0, 0x1, 0x2]).unwrap();
         j.close().unwrap();
         assert_eq!(
-            binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
+            journal::ERR_WRITE_NOT_IN_PROGRESS,
             j.commit().unwrap_err().description()
         );
     }
@@ -448,16 +511,16 @@ mod event_journal_tests {
     }
 
     #[test]
-    pub fn is_still_writing_when_closed() {
+    pub fn is_not_writing_when_closed() {
         let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
         j.open().unwrap();
         j.write(&[0x0, 0x1, 0x2]).unwrap();
         j.close().unwrap();
-        assert!(j.is_writing());
+        assert!(!j.is_writing());
     }
 
     #[test]
-    pub fn is_still_writing_when_reopened() {
+    pub fn is_writing_when_reopened_before_commit() {
         let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
         j.open().unwrap();
         j.write(&[0x0, 0x1, 0x2]).unwrap();
@@ -813,7 +876,7 @@ mod event_journal_tests {
     }
 
     #[test]
-    pub fn read_offset_retains_position_after_reopening() {
+    pub fn read_offset_resets_after_reopening() {
         let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
         j.open().unwrap();
         j.write(&[0x0, 0x1, 0x2]).unwrap();
@@ -822,7 +885,7 @@ mod event_journal_tests {
         assert_eq!(9, j.read_offset());
         j.close().unwrap();
         j.open().unwrap();
-        assert_eq!(9, j.read_offset());
+        assert_eq!(0, j.read_offset());
     }
 
     // write_offset() tests
@@ -861,7 +924,7 @@ mod event_journal_tests {
     }
 
     #[test]
-    pub fn write_offset_retains_position_after_reopening() {
+    pub fn write_offset_goes_to_uncommitted_record_end_when_reopened_before_commit() {
         let mut j = EventJournal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
         j.open().unwrap();
         j.write(&[0x0, 0x1, 0x2]).unwrap();
