@@ -11,6 +11,10 @@ pub static ERR_NOTHING_TO_WRITE: & 'static str =
     "Cannot write 0 bytes";
 pub static ERR_NO_COMMITTED_RECORD: & 'static str =
     "Location is not the start of a committed record";
+pub static ERR_NO_RECORD_DATA: & 'static str =
+    "Record contains no data";
+pub static ERR_CHECKSUM_MISMATCH: & 'static str =
+    "Checksum mismatch, record data may be corrupted";
 
 pub trait Journal {
 
