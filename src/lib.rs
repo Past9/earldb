@@ -9,4 +9,5 @@ extern crate byteorder;
 mod storage;
 mod error;
 
-
+#[cfg(test)]
+mod test;

@@ -1,10 +1,8 @@
-mod util;
-mod file_page;
-mod file_synced_buffer;
-mod binary_storage;
-mod memory_binary_storage;
-mod file_binary_storage;
-mod journal;
+pub mod util;
+pub mod file_page;
+pub mod file_synced_buffer;
+pub mod binary_storage;
+pub mod memory_binary_storage;
+pub mod file_binary_storage;
+pub mod journal;
 
-//pub use self::journal::Journal;
-//pub use self::memory_journal::MemoryJournal;
