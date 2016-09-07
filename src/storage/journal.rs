@@ -17,6 +17,9 @@ pub static ERR_NO_RECORD_DATA: & 'static str =
 pub static ERR_CHECKSUM_MISMATCH: & 'static str =
     "Checksum mismatch, record data may be corrupted";
 
+pub const PRE_DATA_LEN: u64 = 6;
+pub const POST_DATA_LEN: u64 = 3;
+
 pub struct Journal<T: BinaryStorage + Sized> {
     storage: T,
     read_offset: u64,
@@ -236,8 +239,7 @@ impl<T: BinaryStorage + Sized> Journal<T> {
         Ok(
             771 == try!(self.storage.r_u16(
                 self.read_offset + 
-                    mem::size_of::<u16>() as u64 + 
-                    mem::size_of::<u32>() as u64 + 
+                    PRE_DATA_LEN +
                     len as u64 +
                     mem::size_of::<u8>() as u64
             ))
@@ -248,9 +250,7 @@ impl<T: BinaryStorage + Sized> Journal<T> {
         let len = try!(self.storage.r_u32(self.read_offset + mem::size_of::<u16>() as u64)) as usize;
         try!(AssertionError::assert(len > 1, ERR_NO_RECORD_DATA));
         let mut bytes = try!(self.storage.r_bytes(
-            self.read_offset + 
-            mem::size_of::<u16>() as u64 + 
-            mem::size_of::<u32>() as u64,
+            self.read_offset + PRE_DATA_LEN,
             len + mem::size_of::<u8>(),
         ));
 
@@ -322,11 +322,9 @@ impl<T: BinaryStorage + Sized> Iterator for Journal<T> {
             Ok(v) => {
 
                 let new_offset = self.read_offset + 
-                    mem::size_of::<u16>() as u64 + 
-                    mem::size_of::<u32>() as u64 + 
+                    PRE_DATA_LEN + 
                     v.len() as u64 +
-                    mem::size_of::<u8>() as u64 +
-                    mem::size_of::<u16>() as u64;
+                    POST_DATA_LEN;
 
                 match self.jump_to(new_offset) {
                     Ok(_) => {},

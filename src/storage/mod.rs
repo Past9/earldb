@@ -5,4 +5,5 @@ pub mod binary_storage;
 pub mod memory_binary_storage;
 pub mod file_binary_storage;
 pub mod journal;
+pub mod ptr_index;
 
