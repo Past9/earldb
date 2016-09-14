@@ -78,6 +78,9 @@ impl LeafNode {
 
     }
 
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
+        unimplemented!();
+    }
 
     pub fn block(&self) -> u32 { self.block }
 

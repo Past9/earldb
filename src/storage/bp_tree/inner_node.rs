@@ -70,6 +70,10 @@ impl InnerNode {
 
     }
 
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
+        unimplemented!();
+    }
+
     pub fn block(&self) -> u32 { self.block }
 
     pub fn has_parent(&self) -> bool { self.parent != 0 }

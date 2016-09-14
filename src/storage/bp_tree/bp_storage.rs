@@ -1,7 +1,9 @@
 use error::Error;
 
 use storage::binary_storage::BinaryStorage;
-use storage::bp_tree::node::{ Node, NodeType };
+use storage::bp_tree::node::Node;
+use storage::bp_tree::inner_node::InnerNode;
+use storage::bp_tree::leaf_node::LeafNode;
 
 
 pub struct BPStorage<T: BinaryStorage + Sized> {
@@ -30,41 +32,28 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
         self.storage.close()
     }
 
-    pub fn read_node(&mut self, block_num: u32) -> Result<Node, Error> {
+    pub fn read_node(&mut self, block: u32) -> Result<Node, Error> {
         let data = try!(self.storage.r_bytes(
-            block_num as u64 * self.block_size as u64, 
+            block as u64 * self.block_size as u64, 
             self.block_size as usize
         ));
-        Node::from_bytes(data.as_slice(), block_num, self.block_size, self.key_len, self.val_len)
+        Node::from_bytes(data.as_slice(), block, self.block_size, self.key_len, self.val_len)
     }
 
-    pub fn save_node(&mut self, node: Node) -> Result<(), Error> {
+    pub fn save_leaf(&mut self, node: LeafNode) -> Result<(), Error> {
         let data = try!(node.to_bytes());
         self.storage.w_bytes(
-            node.get_block_num() as u64 * self.block_size as u64, 
+            node.block() as u64 * self.block_size as u64, 
             data.as_slice()
         )
     }
 
-    pub fn read_parent(&mut self, node: &Node) -> Option<Result<Node, Error>> {
-        match node.get_parent_block_num() {
-            Some(n) => Some(self.read_node(n)),
-            None => None
-        }
-    }
-
-    pub fn read_prev(&mut self, node: &Node) -> Option<Result<Node, Error>> {
-        match node.get_prev_block_num() {
-            Some(n) => Some(self.read_node(n)),
-            None => None
-        }
-    }
-
-    pub fn read_next(&mut self, node: &Node) -> Option<Result<Node, Error>> {
-        match node.get_next_block_num() {
-            Some(n) => Some(self.read_node(n)),
-            None => None
-        }
+    pub fn save_inner(&mut self, node: InnerNode) -> Result<(), Error> {
+        let data = try!(node.to_bytes());
+        self.storage.w_bytes(
+            node.block() as u64 * self.block_size as u64, 
+            data.as_slice()
+        )
     }
 
 }
