@@ -1,4 +1,5 @@
 use std::io::Cursor;
+use std::ops::Index;
 
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
@@ -95,14 +96,14 @@ impl InnerNode {
         self.parent = 0;
     }
 
-    pub fn len (&self) -> u32 {
+    pub fn len(&self) -> u32 {
         self.len
     }
 
 }
 impl IntoIterator for InnerNode {
 
-    type Item = (Vec<u8>, u32, u32);
+    type Item = InnerNodeRecord;
     type IntoIter = InnerNodeIterator;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -118,20 +119,46 @@ pub struct InnerNodeIterator {
 }
 impl Iterator for InnerNodeIterator {
 
-    type Item = (Vec<u8>, u32, u32);
+    type Item = InnerNodeRecord;
 
-    fn next(&mut self) -> Option<(Vec<u8>, u32, u32)> {
+    fn next(&mut self) -> Option<InnerNodeRecord> {
         if self.current < self.node.len {
             let i = self.current as usize;
             self.current += 1;
-            Some((
-                self.node.keys[i].clone(),
-                self.node.pointers[i].clone(),
-                self.node.pointers[i + 1].clone(),
-            ))
+
+            let is_first = i == 0;
+            let is_last = i < self.node.len as usize - 1;
+
+            Some(InnerNodeRecord {
+                min_key: match is_first {
+                    true => None,
+                    false => Some(self.node.keys[i].clone())
+                },
+                max_key: match is_last {
+                    true => None,
+                    false => Some(self.node.keys[i + 1].clone()),
+                },
+                pointer: self.node.pointers[i] 
+            })
+
+            /*
+            Some(InnerNodeRecord {
+                key: self.node.keys[i].clone(),
+                lt_pointer: self.node.pointers[i].clone(),
+                gte_pointer: self.node.pointers[i + 1].clone(),
+            })
+            */
         } else {
             None
         }
     }
 
 }
+
+
+pub struct InnerNodeRecord {
+    pub min_key: Option<Vec<u8>>,
+    pub max_key: Option<Vec<u8>>,
+    pub pointer: u32,
+}
+

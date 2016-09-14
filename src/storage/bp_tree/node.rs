@@ -29,24 +29,13 @@ impl Node {
 
         match data[0] {
             1 => {
-                let node = try!(InnerNode::from_bytes(
-                    data,
-                    block, 
-                    block_size,
-                    key_len
-                ));
+                let node = try!(InnerNode::from_bytes(data, block, block_size, key_len));
                 Ok(Node::Inner(node))
             },
             2 => {
-                let node = try!(LeafNode::from_bytes(
-                    data,
-                    block, 
-                    block_size,
-                    key_len,
-                    val_len
-                ));
+                let node = try!(LeafNode::from_bytes(data, block, block_size, key_len, val_len));
                 Ok(Node::Leaf(node))
-            }
+            },
             _ => return Err(Error::Assertion(AssertionError::new(ERR_INVALID_NODE_TYPE)))
         }
 
