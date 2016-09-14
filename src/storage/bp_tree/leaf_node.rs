@@ -5,7 +5,6 @@ use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 use error::{ Error, AssertionError };
 use storage::bp_tree::node;
 
-pub static ERR_BLOCK_NOT_LEAF_NODE: & 'static str = "Data block is not a leaf node";
 pub static ERR_INVALID_BLOCK_NUM: & 'static str = "Invalid block number";
 
 const NODE_TYPE_OFFSET: usize = 0;
@@ -36,9 +35,6 @@ impl LeafNode {
         key_len: u32,
         val_len: u32
     ) -> Result<LeafNode, Error> {
-
-        try!(AssertionError::assert(data.len() == block_size as usize, node::ERR_NODE_DATA_WRONG_LENGTH));
-        try!(AssertionError::assert(data[0] == 2, ERR_BLOCK_NOT_LEAF_NODE));
 
         let parent_buf = &data[PARENT_OFFSET..(PARENT_OFFSET + 4)];
         let mut parent_rdr = Cursor::new(parent_buf);

@@ -3,19 +3,57 @@ use std::io::Cursor;
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
 use error::{ Error, AssertionError };
+use storage::bp_tree::inner_node::InnerNode;
+use storage::bp_tree::leaf_node::LeafNode;
 
-pub static ERR_NODE_CORRUPTED: & 'static str = "Node type not recognized";
+pub static ERR_INVALID_NODE_TYPE: & 'static str = "Node type not recognized";
 pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "Invalid node block size";
 
 const NODE_TYPE_OFFSET: usize = 0;
-const HAS_PARENT_BLOCK_OFFSET: usize = 1;
-const PARENT_BLOCK_NUM_OFFSET: usize = 2;
-const HAS_PREV_BLOCK_OFFSET: usize = 6;
-const PREV_BLOCK_NUM_OFFSET: usize = 7;
-const HAS_NEXT_BLOCK_OFFSET: usize = 11;
-const NEXT_BLOCK_NUM_OFFSET: usize = 12;
-const NUM_RECORDS_OFFSET: usize = 16;
-const RECORDS_OFFSET: usize = 20;
+
+pub enum Node {
+    Inner(InnerNode),
+    Leaf(LeafNode)
+}
+impl Node {
+
+    pub fn from_bytes(
+        data: &[u8],
+        block: u32,
+        block_size: u32,
+        key_len: u32,
+        val_len: u32
+    ) -> Result<Node, Error> {
+
+        try!(AssertionError::assert(data.len() == block_size as usize, ERR_NODE_DATA_WRONG_LENGTH));
+
+        match data[0] {
+            1 => {
+                let node = try!(InnerNode::from_bytes(
+                    data,
+                    block, 
+                    block_size,
+                    key_len
+                ));
+                Ok(Node::Inner(node))
+            },
+            2 => {
+                let node = try!(LeafNode::from_bytes(
+                    data,
+                    block, 
+                    block_size,
+                    key_len,
+                    val_len
+                ));
+                Ok(Node::Leaf(node))
+            }
+            _ => return Err(Error::Assertion(AssertionError::new(ERR_INVALID_NODE_TYPE)))
+        }
+
+    }
+
+}
+
 
 /*
 
