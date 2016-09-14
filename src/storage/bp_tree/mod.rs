@@ -1,4 +1,4 @@
 mod node;
 mod bp_storage;
 
-//pub mod bp_tree;
+pub mod bp_tree;

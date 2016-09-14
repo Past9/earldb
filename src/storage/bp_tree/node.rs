@@ -37,6 +37,7 @@ pub struct Node {
     values: Vec<Vec<u8>>,
     key_len: u32,
     val_len: u32,
+    current_rec: u32
 }
 impl Node {
 
@@ -121,7 +122,8 @@ impl Node {
             keys: keys,
             values: values,
             key_len: key_len,
-            val_len: val_len
+            val_len: val_len,
+            current_rec: 0
         })
 
     }
@@ -190,7 +192,7 @@ impl Node {
     pub fn has_next_block(&self) -> bool { self.has_next_block }
 
     pub fn is_root(&self) -> bool {
-        !self.has_parent_block
+        !self.has_parent_block && self.block_num == 1
     }
 
     pub fn get_parent_block_num(&self) -> Option<u32> { 
@@ -244,7 +246,25 @@ impl Node {
         self.parent_block_num = 0;
     }
 
-
+    pub fn reset(&mut self) {
+        self.current_rec = 0;
+    }
 
 }
+impl Iterator for Node {
 
+    type Item = (Vec<u8>, Vec<u8>);
+
+    fn next(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
+
+        if self.current_rec < self.num_records {
+            let i = self.current_rec as usize;
+            self.current_rec += 1;
+            Some((self.keys[i].clone(), self.values[i].clone()))
+        } else {
+            None
+        }
+
+    }
+
+}
