@@ -34,8 +34,18 @@ impl<T: BinaryStorage + Sized> BPTree<T> {
         self.storage.close()
     }
 
-    pub fn search(&mut self, min: &[u8], max: &[u8]) -> Result<Vec<Vec<u8>>, Error> {
-        unimplemented!();
+    pub fn search(&mut self, k: &[u8]) -> Result<Node, Error> {
+        let root = try!(self.storage.read_node(1))
+        self.tree_search(k, root);
+    }
+
+    fn tree_search(&mut self, k: &[u8], node: Node) -> Result<Node, Error> {
+        match node.get_node_type() {
+            NodeType::Leaf => Ok(node),
+            NodeType::Inner => {
+
+            }
+        }
     }
 
 }

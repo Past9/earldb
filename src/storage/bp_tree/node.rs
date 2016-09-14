@@ -191,9 +191,7 @@ impl Node {
     pub fn has_prev_block(&self) -> bool { self.has_prev_block }
     pub fn has_next_block(&self) -> bool { self.has_next_block }
 
-    pub fn is_root(&self) -> bool {
-        !self.has_parent_block && self.block_num == 1
-    }
+    pub fn is_root(&self) -> bool { !self.has_parent_block && self.block_num == 1 }
 
     pub fn get_parent_block_num(&self) -> Option<u32> { 
         match self.has_parent_block {
@@ -246,9 +244,9 @@ impl Node {
         self.parent_block_num = 0;
     }
 
-    pub fn reset(&mut self) {
-        self.current_rec = 0;
-    }
+    pub fn get_node_type(&self) -> NodeType { self.node_type }
+
+    pub fn reset(&mut self) { self.current_rec = 0; }
 
 }
 impl Iterator for Node {
