@@ -1,13 +1,18 @@
 use error::{ Error, AssertionError };
 use storage::binary_storage::BinaryStorage;
 
-pub static ERR_NODE_TYPE_INVALID: & 'static str = "Node type not recognized";
+pub static ERR_NODE_CORRUPTED: & 'static str = "Node type not recognized";
 pub static ERR_NO_NODE_DATA: & 'static str = "No data for node";
 
 const NODE_TYPE_OFFSET: u64 = 0;
-const PARENT_PTR_OFFSET: u64 = 1;
-const NUM_RECORDS_OFFSET: u64 = 9;
-const RECORDS_OFFSET: u64 = 17;
+const HAS_PARENT_BLOCK_OFFSET: u64 = 1;
+const PARENT_BLOCK_NUM_OFFSET: u64 = 2;
+const HAS_PREV_BLOCK_OFFSET: u64 = 10;
+const PREV_BLOCK_NUM_OFFSET: u64 = 11;
+const HAS_NEXT_BLOCK_OFFSET: u64 = 19;
+const NEXT_BLOCK_NUM_OFFSET: u64 = 20;
+const NUM_RECORDS_OFFSET: u64 = 28;
+const RECORDS_OFFSET: u64 = 36;
 
 pub enum NodeType {
     Inner,
@@ -16,10 +21,15 @@ pub enum NodeType {
 
 pub struct Node {
     offset: u64,
-    size_bytes: u64,
+    block_size: u64,
     node_type: NodeType,
     num_records: u64,
-    parent_ptr: u64,
+    has_parent_block: bool,
+    has_prev_block: bool,
+    has_next_block: bool,
+    parent_block_num: u64,
+    prev_block_num: u64,
+    next_block_num: u64,
     keys: Vec<Vec<u8>>,
     values: Vec<Vec<u8>>,
     key_len: usize,
@@ -30,7 +40,6 @@ impl Node {
     pub fn from_storage<T: BinaryStorage + Sized>(
         storage: &mut T,
         offset: u64,
-        size_bytes: u64,
         block_size: u64,
         key_len: usize, 
         val_len: usize
@@ -39,10 +48,39 @@ impl Node {
         let node_type = match try!(storage.r_u8(offset + NODE_TYPE_OFFSET)) {
             1 => NodeType::Inner,
             2 => NodeType::Leaf,
-            _ => return Err(Error::Assertion(AssertionError::new(ERR_NODE_TYPE_INVALID)))
+            _ => return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)))
         };
 
-        let parent_ptr = try!(storage.r_u64(offset + PARENT_PTR_OFFSET));
+        let mut parent_block_num = 0;
+        let has_parent_block = match try!(storage.r_u8(offset + HAS_PARENT_BLOCK_OFFSET)) {
+            1 => {
+                parent_block_num = try!(storage.r_u64(offset + PARENT_BLOCK_NUM_OFFSET));
+                true
+            },
+            2 => false,
+            _ => return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)))
+        };
+
+        let mut prev_block_num = 0;
+        let has_prev_block = match try!(storage.r_u8(offset + HAS_PREV_BLOCK_OFFSET)) {
+            1 => {
+                prev_block_num = try!(storage.r_u64(offset + PREV_BLOCK_NUM_OFFSET));
+                true
+            },
+            2 => false,
+            _ => return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)))
+        };
+
+        let mut next_block_num = 0;
+        let has_next_block = match try!(storage.r_u8(offset + HAS_NEXT_BLOCK_OFFSET)) {
+            1 => {
+                next_block_num = try!(storage.r_u64(offset + NEXT_BLOCK_NUM_OFFSET));
+                true
+            },
+            2 => false,
+            _ => return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)))
+        };
+
         let num_records = try!(storage.r_u64(offset + NUM_RECORDS_OFFSET));
 
         let mut keys = Vec::new();
@@ -58,9 +96,14 @@ impl Node {
 
         Ok(Node {
             offset: offset,
-            size_bytes: size_bytes,
+            block_size: block_size,
             node_type: node_type,
-            parent_ptr: parent_ptr,
+            has_parent_block: has_parent_block,
+            has_prev_block: has_prev_block,
+            has_next_block: has_next_block,
+            parent_block_num: parent_block_num,
+            prev_block_num: prev_block_num,
+            next_block_num: next_block_num,
             num_records: num_records, 
             keys: keys,
             values: values,
@@ -81,7 +124,9 @@ impl Node {
             NodeType::Leaf => 2,
         }));
 
-        try!(storage.w_u64(self.offset + PARENT_PTR_OFFSET, self.parent_ptr));
+        try!(storage.w_u64(self.offset + PARENT_BLOCK_NUM_OFFSET, self.parent_block_num));
+        try!(storage.w_u64(self.offset + PREV_BLOCK_NUM_OFFSET, self.prev_block_num));
+        try!(storage.w_u64(self.offset + NEXT_BLOCK_NUM_OFFSET, self.next_block_num));
         try!(storage.w_u64(self.offset + NUM_RECORDS_OFFSET, self.num_records));
 
         let mut rec_data = Vec::new();
@@ -95,6 +140,36 @@ impl Node {
         Ok(())
 
     }
+
+    pub fn has_parent_block(&self) -> bool { self.has_parent_block }
+    pub fn has_prev_block(&self) -> bool { self.has_prev_block }
+    pub fn has_next_block(&self) -> bool { self.has_next_block }
+
+    pub fn is_root(&self) -> bool {
+        !self.has_parent_block
+    }
+
+    pub fn get_parent_block_num(&self) -> Option<u64> { 
+        match self.has_parent_block {
+            true => Some(self.parent_block_num),
+            false => None
+        }
+    }
+
+    pub fn get_prev_block_num(&self) -> Option<u64> { 
+        match self.has_prev_block {
+            true => Some(self.prev_block_num),
+            false => None
+        }
+    }
+
+    pub fn get_next_block_num(&self) -> Option<u64> { 
+        match self.has_next_block {
+            true => Some(self.next_block_num),
+            false => None
+        }
+    }
+
 
 }
 
