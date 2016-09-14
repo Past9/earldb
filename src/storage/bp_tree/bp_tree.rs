@@ -1,4 +1,5 @@
 
+/*
 use storage::binary_storage::BinaryStorage;
 
 struct LeafNode {
@@ -30,3 +31,4 @@ impl<T: BinaryStorage + Sized> BPTree<T> {
     }
 
 }
+*/

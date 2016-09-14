@@ -1,3 +1,4 @@
+/*
 use error::Error;
 
 use storage::binary_storage::BinaryStorage;
@@ -67,3 +68,4 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
 
 
 }
+*/

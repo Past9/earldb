@@ -1,18 +1,22 @@
+use std::io::Cursor;
+
+use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
+
 use error::{ Error, AssertionError };
 use storage::binary_storage::BinaryStorage;
 
 pub static ERR_NODE_CORRUPTED: & 'static str = "Node type not recognized";
-pub static ERR_NO_NODE_DATA: & 'static str = "No data for node";
+pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "No data for node";
 
-const NODE_TYPE_OFFSET: u64 = 0;
-const HAS_PARENT_BLOCK_OFFSET: u64 = 1;
-const PARENT_BLOCK_NUM_OFFSET: u64 = 2;
-const HAS_PREV_BLOCK_OFFSET: u64 = 10;
-const PREV_BLOCK_NUM_OFFSET: u64 = 11;
-const HAS_NEXT_BLOCK_OFFSET: u64 = 19;
-const NEXT_BLOCK_NUM_OFFSET: u64 = 20;
-const NUM_RECORDS_OFFSET: u64 = 28;
-const RECORDS_OFFSET: u64 = 36;
+const NODE_TYPE_OFFSET: usize = 0;
+const HAS_PARENT_BLOCK_OFFSET: usize = 1;
+const PARENT_BLOCK_NUM_OFFSET: usize = 2;
+const HAS_PREV_BLOCK_OFFSET: usize = 6;
+const PREV_BLOCK_NUM_OFFSET: usize = 7;
+const HAS_NEXT_BLOCK_OFFSET: usize = 11;
+const NEXT_BLOCK_NUM_OFFSET: usize = 12;
+const NUM_RECORDS_OFFSET: usize = 16;
+const RECORDS_OFFSET: usize = 20;
 
 pub enum NodeType {
     Inner,
@@ -20,41 +24,45 @@ pub enum NodeType {
 }
 
 pub struct Node {
-    offset: u64,
-    block_size: u64,
+    block_num: u32,
+    block_size: u32,
     node_type: NodeType,
-    num_records: u64,
+    num_records: u32,
     has_parent_block: bool,
     has_prev_block: bool,
     has_next_block: bool,
-    parent_block_num: u64,
-    prev_block_num: u64,
-    next_block_num: u64,
+    parent_block_num: u32,
+    prev_block_num: u32,
+    next_block_num: u32,
     keys: Vec<Vec<u8>>,
     values: Vec<Vec<u8>>,
-    key_len: usize,
-    val_len: usize,
+    key_len: u32,
+    val_len: u32,
 }
 impl Node {
 
-    pub fn from_storage<T: BinaryStorage + Sized>(
-        storage: &mut T,
-        offset: u64,
-        block_size: u64,
-        key_len: usize, 
-        val_len: usize
+    pub fn from_bytes<T: BinaryStorage + Sized>(
+        data: &[u8],
+        block_num: u32,
+        block_size: u32,
+        key_len: u32, 
+        val_len: u32
     ) -> Result<Node, Error> {
 
-        let node_type = match try!(storage.r_u8(offset + NODE_TYPE_OFFSET)) {
+        try!(AssertionError::assert(data.len() == block_size as usize, ERR_NODE_DATA_WRONG_LENGTH));
+
+        let node_type = match data[0] {
             1 => NodeType::Inner,
             2 => NodeType::Leaf,
             _ => return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)))
         };
 
         let mut parent_block_num = 0;
-        let has_parent_block = match try!(storage.r_u8(offset + HAS_PARENT_BLOCK_OFFSET)) {
+        let has_parent_block = match data[HAS_PARENT_BLOCK_OFFSET] {
             1 => {
-                parent_block_num = try!(storage.r_u64(offset + PARENT_BLOCK_NUM_OFFSET));
+                let buf = &data[PARENT_BLOCK_NUM_OFFSET..(PARENT_BLOCK_NUM_OFFSET + 4)];
+                let mut rdr = Cursor::new(buf);
+                parent_block_num = try!(rdr.read_u32::<LittleEndian>());
                 true
             },
             2 => false,
@@ -62,9 +70,11 @@ impl Node {
         };
 
         let mut prev_block_num = 0;
-        let has_prev_block = match try!(storage.r_u8(offset + HAS_PREV_BLOCK_OFFSET)) {
+        let has_prev_block = match data[HAS_PREV_BLOCK_OFFSET] {
             1 => {
-                prev_block_num = try!(storage.r_u64(offset + PREV_BLOCK_NUM_OFFSET));
+                let buf = &data[PREV_BLOCK_NUM_OFFSET..(PREV_BLOCK_NUM_OFFSET + 4)];
+                let mut rdr = Cursor::new(buf);
+                prev_block_num = try!(rdr.read_u32::<LittleEndian>());
                 true
             },
             2 => false,
@@ -72,30 +82,34 @@ impl Node {
         };
 
         let mut next_block_num = 0;
-        let has_next_block = match try!(storage.r_u8(offset + HAS_NEXT_BLOCK_OFFSET)) {
+        let has_next_block = match data[HAS_NEXT_BLOCK_OFFSET] {
             1 => {
-                next_block_num = try!(storage.r_u64(offset + NEXT_BLOCK_NUM_OFFSET));
+                let buf = &data[NEXT_BLOCK_NUM_OFFSET..(NEXT_BLOCK_NUM_OFFSET + 4)];
+                let mut rdr = Cursor::new(buf);
+                next_block_num = try!(rdr.read_u32::<LittleEndian>());
                 true
             },
             2 => false,
             _ => return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)))
         };
 
-        let num_records = try!(storage.r_u64(offset + NUM_RECORDS_OFFSET));
+        let buf = &data[NUM_RECORDS_OFFSET..(NUM_RECORDS_OFFSET + 4)];
+        let mut rdr = Cursor::new(buf);
+        let num_records = try!(rdr.read_u32::<LittleEndian>());
 
         let mut keys = Vec::new();
         let mut values = Vec::new();
 
-        let rec_len = (key_len + val_len) as u64;
+        let rec_len = (key_len + val_len) as usize;
         for i in 0..num_records {
-            let k_offset = offset + RECORDS_OFFSET + rec_len * i;
-            let v_offset = k_offset + key_len as u64;
-            keys.push(try!(storage.r_bytes(offset + k_offset, key_len))); 
-            values.push(try!(storage.r_bytes(offset + v_offset, val_len))); 
+            let k_offset = RECORDS_OFFSET + rec_len * i as usize;
+            let v_offset = k_offset + key_len as usize;
+            keys.push(data[k_offset..key_len as usize].to_vec()); 
+            values.push(data[v_offset..val_len as usize].to_vec()); 
         }
 
         Ok(Node {
-            offset: offset,
+            block_num: block_num,
             block_size: block_size,
             node_type: node_type,
             has_parent_block: has_parent_block,
@@ -114,30 +128,62 @@ impl Node {
     }
 
 
-    pub fn to_storage<T: BinaryStorage + Sized>(
+    pub fn to_bytes<T: BinaryStorage + Sized>(
         &self, 
         storage: &mut T
-    ) -> Result<(), Error> {
+    ) -> Result<Vec<u8>, Error> {
 
-        try!(storage.w_u8(self.offset + NODE_TYPE_OFFSET, match self.node_type {
+        let offset = self.block_num * self.block_size;
+
+        let mut data: Vec<u8> = vec![0; self.block_size as usize];
+
+        data.push(match self.node_type {
             NodeType::Inner => 1,
-            NodeType::Leaf => 2,
-        }));
+            NodeType::Leaf => 2
+        });
 
-        try!(storage.w_u64(self.offset + PARENT_BLOCK_NUM_OFFSET, self.parent_block_num));
-        try!(storage.w_u64(self.offset + PREV_BLOCK_NUM_OFFSET, self.prev_block_num));
-        try!(storage.w_u64(self.offset + NEXT_BLOCK_NUM_OFFSET, self.next_block_num));
-        try!(storage.w_u64(self.offset + NUM_RECORDS_OFFSET, self.num_records));
+        data.push(match self.has_parent_block {
+            true => 1,
+            false => 0
+        });
 
-        let mut rec_data = Vec::new();
+        let mut parent_block_num_buf = vec!();
+        try!(parent_block_num_buf.write_u32::<LittleEndian>(self.parent_block_num));
+        data.extend_from_slice(parent_block_num_buf.as_slice());
+
+        data.push(match self.has_prev_block {
+            true => 1,
+            false => 0
+        });
+
+        let mut prev_block_num_buf = vec!();
+        try!(prev_block_num_buf.write_u32::<LittleEndian>(self.prev_block_num));
+        data.extend_from_slice(prev_block_num_buf.as_slice());
+
+        data.push(match self.has_next_block {
+            true => 1,
+            false => 0
+        });
+
+        let mut next_block_num_buf = vec!();
+        try!(next_block_num_buf.write_u32::<LittleEndian>(self.next_block_num));
+        data.extend_from_slice(next_block_num_buf.as_slice());
+
+        let mut num_records_buf = vec!();
+        try!(num_records_buf.write_u32::<LittleEndian>(self.num_records));
+        data.extend_from_slice(num_records_buf.as_slice());
+
         for i in 0..self.num_records {
-            rec_data.extend_from_slice(self.keys[i as usize].as_slice());
-            rec_data.extend_from_slice(self.values[i as usize].as_slice());
+            data.extend_from_slice(self.keys[i as usize].as_slice());
+            data.extend_from_slice(self.values[i as usize].as_slice());
         }
 
-        try!(storage.w_bytes(self.offset + RECORDS_OFFSET, rec_data.as_slice()));
+        if data.len() < self.block_size as usize {
+            let padding = vec![0; (self.block_size as usize) - data.len()];
+            data.extend_from_slice(padding.as_slice());
+        }
 
-        Ok(())
+        Ok(data)
 
     }
 
@@ -149,21 +195,21 @@ impl Node {
         !self.has_parent_block
     }
 
-    pub fn get_parent_block_num(&self) -> Option<u64> { 
+    pub fn get_parent_block_num(&self) -> Option<u32> { 
         match self.has_parent_block {
             true => Some(self.parent_block_num),
             false => None
         }
     }
 
-    pub fn get_prev_block_num(&self) -> Option<u64> { 
+    pub fn get_prev_block_num(&self) -> Option<u32> { 
         match self.has_prev_block {
             true => Some(self.prev_block_num),
             false => None
         }
     }
 
-    pub fn get_next_block_num(&self) -> Option<u64> { 
+    pub fn get_next_block_num(&self) -> Option<u32> { 
         match self.has_next_block {
             true => Some(self.next_block_num),
             false => None
