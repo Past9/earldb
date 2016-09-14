@@ -214,6 +214,37 @@ impl Node {
         }
     }
 
+    pub fn set_prev_block_num(&mut self, prev_block_num: u32) {
+        self.has_prev_block = true;
+        self.prev_block_num = prev_block_num;
+    }
+
+    pub fn set_next_block_num(&mut self, next_block_num: u32) {
+        self.has_next_block = true;
+        self.next_block_num = next_block_num;
+    }
+
+    pub fn set_parent_block_num(&mut self, parent_block_num: u32) {
+        self.has_parent_block = true;
+        self.parent_block_num = parent_block_num;
+    }
+
+    pub fn remove_prev_block(&mut self) {
+        self.has_prev_block = false;
+        self.prev_block_num = 0;
+    }
+
+    pub fn remove_next_block(&mut self) {
+        self.has_next_block = false;
+        self.next_block_num = 0;
+    }
+
+    pub fn remove_parent_block(&mut self) {
+        self.has_parent_block = false;
+        self.parent_block_num = 0;
+    }
+
+
 
 }
 
