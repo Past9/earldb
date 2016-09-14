@@ -5,7 +5,7 @@ use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 use error::{ Error, AssertionError };
 
 pub static ERR_NODE_CORRUPTED: & 'static str = "Node type not recognized";
-pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "No data for node";
+pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "Invalid node block size";
 
 const NODE_TYPE_OFFSET: usize = 0;
 const HAS_PARENT_BLOCK_OFFSET: usize = 1;
@@ -16,6 +16,8 @@ const HAS_NEXT_BLOCK_OFFSET: usize = 11;
 const NEXT_BLOCK_NUM_OFFSET: usize = 12;
 const NUM_RECORDS_OFFSET: usize = 16;
 const RECORDS_OFFSET: usize = 20;
+
+/*
 
 pub enum NodeType {
     Inner,
@@ -266,3 +268,4 @@ impl Iterator for Node {
     }
 
 }
+*/

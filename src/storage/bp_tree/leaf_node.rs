@@ -3,9 +3,8 @@ use std::io::Cursor;
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
 use error::{ Error, AssertionError };
+use storage::bp_tree::node;
 
-pub static ERR_NODE_CORRUPTED: & 'static str = "Node type not recognized";
-pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "No data for node";
 pub static ERR_BLOCK_NOT_LEAF_NODE: & 'static str = "Data block is not a leaf node";
 pub static ERR_INVALID_BLOCK_NUM: & 'static str = "Invalid block number";
 
@@ -38,7 +37,7 @@ impl LeafNode {
         val_len: u32
     ) -> Result<LeafNode, Error> {
 
-        try!(AssertionError::assert(data.len() == block_size as usize, ERR_NODE_DATA_WRONG_LENGTH));
+        try!(AssertionError::assert(data.len() == block_size as usize, node::ERR_NODE_DATA_WRONG_LENGTH));
         try!(AssertionError::assert(data[0] == 2, ERR_BLOCK_NOT_LEAF_NODE));
 
         let parent_buf = &data[PARENT_OFFSET..(PARENT_OFFSET + 4)];
@@ -64,8 +63,8 @@ impl LeafNode {
         for i in 0..len {
             let k_offset = RECORDS_OFFSET + rec_len * i as usize;
             let v_offset = k_offset + key_len as usize;
-            keys.push(data[k_offset..key_len as usize].to_vec()); 
-            values.push(data[v_offset..val_len as usize].to_vec()); 
+            keys.push(data[k_offset..(k_offset + key_len as usize)].to_vec()); 
+            values.push(data[v_offset..(v_offset + val_len as usize)].to_vec()); 
         }
 
         Ok(LeafNode {
@@ -149,28 +148,31 @@ impl LeafNode {
 impl IntoIterator for LeafNode {
 
     type Item = (Vec<u8>, Vec<u8>);
-    type IntoIter = LeafIterator;
+    type IntoIter = LeafNodeIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        LeafIterator { leaf: self, current: 0 }
+        LeafNodeIterator { node: self, current: 0 }
     }
 
 }
 
 
-pub struct LeafIterator {
-    leaf: LeafNode,
+pub struct LeafNodeIterator {
+    node: LeafNode,
     current: u32
 }
-impl Iterator for LeafIterator {
+impl Iterator for LeafNodeIterator {
 
     type Item = (Vec<u8>, Vec<u8>);
 
     fn next(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
-        if self.current < self.leaf.len {
-            let i = self.current;
+        if self.current < self.node.len {
+            let i = self.current as usize;
             self.current += 1;
-            Some((self.leaf.keys[i as usize].clone(), self.leaf.values[i as usize].clone()))
+            Some((
+                self.node.keys[i].clone(), 
+                self.node.values[i].clone()
+            ))
         } else {
             None
         }
