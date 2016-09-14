@@ -1,4 +1,3 @@
-/*
 use error::Error;
 
 use storage::binary_storage::BinaryStorage;
@@ -7,13 +6,13 @@ use storage::bp_tree::node::{ Node, NodeType };
 
 pub struct BPStorage<T: BinaryStorage + Sized> {
     storage: T,
-    block_size: u64,
-    key_len: usize,
-    val_len: usize
+    block_size: u32,
+    key_len: u32,
+    val_len: u32
 }
 impl<T: BinaryStorage + Sized> BPStorage<T> {
 
-    pub fn new(mut storage: T, block_size: u64, key_len: usize, val_len: usize) -> BPStorage<T> {
+    pub fn new(mut storage: T, block_size: u32, key_len: u32, val_len: u32) -> BPStorage<T> {
         storage.set_use_txn_boundary(false);
         BPStorage {
             storage: storage,
@@ -31,18 +30,20 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
         self.storage.close()
     }
 
-    pub fn read_node(&mut self, block_num: u64) -> Result<Node, Error> {
-        Node::from_storage(
-            &mut self.storage,
-            block_num * self.block_size,
-            self.block_size,
-            self.key_len,
-            self.val_len
-        )
+    pub fn read_node(&mut self, block_num: u32) -> Result<Node, Error> {
+        let data = try!(self.storage.r_bytes(
+            block_num as u64 * self.block_size as u64, 
+            self.block_size as usize
+        ));
+        Node::from_bytes(data.as_slice(), block_num, self.block_size, self.key_len, self.val_len)
     }
 
     pub fn save_node(&mut self, node: Node) -> Result<(), Error> {
-        node.to_storage(&mut self.storage)
+        let data = try!(node.to_bytes());
+        self.storage.w_bytes(
+            node.get_block_num() as u64 * self.block_size as u64, 
+            data.as_slice()
+        )
     }
 
     pub fn read_parent(&mut self, node: &Node) -> Option<Result<Node, Error>> {
@@ -68,4 +69,3 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
 
 
 }
-*/

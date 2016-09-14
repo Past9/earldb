@@ -3,7 +3,6 @@ use std::io::Cursor;
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
 use error::{ Error, AssertionError };
-use storage::binary_storage::BinaryStorage;
 
 pub static ERR_NODE_CORRUPTED: & 'static str = "Node type not recognized";
 pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "No data for node";
@@ -41,7 +40,7 @@ pub struct Node {
 }
 impl Node {
 
-    pub fn from_bytes<T: BinaryStorage + Sized>(
+    pub fn from_bytes(
         data: &[u8],
         block_num: u32,
         block_size: u32,
@@ -128,10 +127,7 @@ impl Node {
     }
 
 
-    pub fn to_bytes<T: BinaryStorage + Sized>(
-        &self, 
-        storage: &mut T
-    ) -> Result<Vec<u8>, Error> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
 
         let offset = self.block_num * self.block_size;
 
@@ -186,6 +182,8 @@ impl Node {
         Ok(data)
 
     }
+
+    pub fn get_block_num(&self) -> u32 { self.block_num }
 
     pub fn has_parent_block(&self) -> bool { self.has_parent_block }
     pub fn has_prev_block(&self) -> bool { self.has_prev_block }
