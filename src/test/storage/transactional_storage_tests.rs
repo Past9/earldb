@@ -11,6 +11,7 @@ fn new_storage() -> TransactionalStorage<MemoryBinaryStorage> {
 }
 
 
+// writer tests
 #[test]
 pub fn w_i8_does_not_write_before_txn_boundary() {
     let mut s = new_storage();
@@ -209,3 +210,52 @@ pub fn w_str_does_not_write_before_txn_boundary() {
     assert_eq!("I \u{2661} Rust", s.r_str(16, 10).unwrap()); 
 }
 
+
+// reader tests
+#[test]
+pub fn r_i8_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(4).unwrap();
+    assert!(s.r_i8(3).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_i8(4).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_i16_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(4).unwrap();
+    assert!(s.r_i16(2).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_i16(3).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_i32_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_i32(4).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_i32(5).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_i64_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_i64(0).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_i64(1).unwrap_err().description()
+    );
+}
