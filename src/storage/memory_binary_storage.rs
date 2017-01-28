@@ -13,8 +13,10 @@ pub struct MemoryBinaryStorage {
     is_open: bool,
     capacity: u64,
     expand_size: u64,
+    /*
     use_txn_boundary: bool,
     txn_boundary: u64,
+    */
     align: usize
 }
 impl MemoryBinaryStorage {
@@ -22,7 +24,7 @@ impl MemoryBinaryStorage {
     pub fn new(
         initial_capacity: u64, 
         expand_size: u64, 
-        use_txn_boundary: bool
+        //use_txn_boundary: bool
     ) -> Result<MemoryBinaryStorage, Error> {
 
         try!(MemoryBinaryStorage::check_params(
@@ -47,8 +49,10 @@ impl MemoryBinaryStorage {
             is_open: false,
             capacity: initial_capacity,
             expand_size: expand_size,
+            /*
             use_txn_boundary: use_txn_boundary,
             txn_boundary: 0,
+            */
             align: align
         })
 
@@ -69,6 +73,7 @@ impl MemoryBinaryStorage {
         let end_offset = try!(util::usize_add(c_offset, mem::size_of::<T>()));
         try!(util::usize_add(self.origin as usize, end_offset));
 
+        /*
         if self.use_txn_boundary {
             let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
@@ -76,6 +81,7 @@ impl MemoryBinaryStorage {
                 binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
             ));
         }
+        */
         
         try!(self.expand(end_offset as u64));
         unsafe { ptr::write(self.ptr_mut(c_offset), data) }
@@ -92,6 +98,7 @@ impl MemoryBinaryStorage {
 
         try!(AssertionError::assert_not(end_offset > c_capacity, binary_storage::ERR_READ_PAST_END));
 
+        /*
         if self.use_txn_boundary {
             let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
@@ -99,6 +106,7 @@ impl MemoryBinaryStorage {
                 binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
             ));
         }
+        */
 
         unsafe { Ok(ptr::read(self.ptr(c_offset))) }
     }
@@ -169,6 +177,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         let end_offset = try!(util::usize_add(c_offset, data.len()));
         try!(util::usize_add(self.origin as usize, end_offset));
 
+        /*
         if self.use_txn_boundary {
             let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
@@ -176,6 +185,7 @@ impl BinaryStorage for MemoryBinaryStorage {
                 binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
             ));
         }
+        */
 
         try!(self.expand(end_offset as u64));
 
@@ -214,6 +224,7 @@ impl BinaryStorage for MemoryBinaryStorage {
 
         try!(AssertionError::assert_not(end_offset > c_capacity, binary_storage::ERR_READ_PAST_END));
 
+        /*
         if self.use_txn_boundary {
             let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
@@ -221,6 +232,7 @@ impl BinaryStorage for MemoryBinaryStorage {
                 binary_storage::ERR_READ_AFTER_TXN_BOUNDARY
             ));
         }
+        */
 
         let src = unsafe { slice::from_raw_parts::<u8>(self.ptr(c_offset), len) };
         let mut dst = vec![0; len];
@@ -261,6 +273,7 @@ impl BinaryStorage for MemoryBinaryStorage {
             binary_storage::ERR_WRITE_NOTHING
         ));
 
+        /*
         if self.use_txn_boundary {
             let c_boundary = try!(util::u64_as_usize(self.txn_boundary));
             try!(AssertionError::assert_not(
@@ -268,6 +281,7 @@ impl BinaryStorage for MemoryBinaryStorage {
                 binary_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY
             ));
         }
+        */
         
         unsafe { ptr::write_bytes::<u8>(self.ptr_mut(start_offset), val, end_offset - start_offset) }
         Ok(())
@@ -312,6 +326,7 @@ impl BinaryStorage for MemoryBinaryStorage {
     }
 
 
+    /*
     fn get_use_txn_boundary(&self) -> bool {
         self.use_txn_boundary
     }
@@ -345,6 +360,7 @@ impl BinaryStorage for MemoryBinaryStorage {
         self.txn_boundary = offset;
         Ok(())
     }
+    */
 
 
     fn get_expand_size(&self) -> u64 {

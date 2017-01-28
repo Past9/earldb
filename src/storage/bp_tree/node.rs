@@ -25,7 +25,10 @@ impl Node {
         val_len: u32
     ) -> Result<Node, Error> {
 
-        try!(AssertionError::assert(data.len() == block_size as usize, ERR_NODE_DATA_WRONG_LENGTH));
+        try!(AssertionError::assert(
+            data.len() == block_size as usize, 
+            ERR_NODE_DATA_WRONG_LENGTH
+        ));
 
         match data[0] {
             1 => {

@@ -18,7 +18,13 @@ pub struct BPTree<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> {
 }
 impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
 
-    pub fn new(mut storage: T, block_size: u32, key_len: u32, val_len: u32, key_cmp: F) -> BPTree<T, F> {
+    pub fn new(
+        mut storage: T, 
+        block_size: u32, 
+        key_len: u32, 
+        val_len: u32, 
+        key_cmp: F
+    ) -> BPTree<T, F> {
         storage.set_use_txn_boundary(false);
         let bp_storage = BPStorage::new(storage, block_size, key_len, val_len);
 

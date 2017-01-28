@@ -47,7 +47,9 @@ fn is_open_after_open() {
 
 #[test]
 fn is_closed_after_open_and_close() {
-    binary_storage_tests::is_closed_after_open_and_close(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    binary_storage_tests::is_closed_after_open_and_close(
+        MemoryBinaryStorage::new(256, 256, false).unwrap()
+    );
 }
 
 // new() tests
@@ -130,17 +132,23 @@ fn new_initializes_memory_to_zeros() {
 // w_i8() tests
 #[test]
 fn w_i8_returns_err_when_closed() {
-    binary_storage_tests::w_i8_returns_err_when_closed(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    binary_storage_tests::w_i8_returns_err_when_closed(
+        MemoryBinaryStorage::new(256, 256, false).unwrap()
+    );
 }
 
 #[test]
 fn w_i8_returns_ok_when_open() {
-    binary_storage_tests::w_i8_returns_ok_when_open(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    binary_storage_tests::w_i8_returns_ok_when_open(
+        MemoryBinaryStorage::new(256, 256, false).unwrap()
+    );
 }
 
 #[test]
 fn w_i8_does_not_write_when_closed() {
-    binary_storage_tests::w_i8_does_not_write_when_closed(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    binary_storage_tests::w_i8_does_not_write_when_closed(
+        MemoryBinaryStorage::new(256, 256, false).unwrap()
+    );
 }
 
 #[test]
@@ -1423,7 +1431,8 @@ fn is_filled_goes_to_end_when_end_offset_is_none() {
     );
 }
 
-// get_use_txn_boundary(), set_use_txn_boundary(), get_txn_boundary(), and set_txn_boundary() tests
+// get_use_txn_boundary(), set_use_txn_boundary(), get_txn_boundary(), 
+// and set_txn_boundary() tests
 #[test]
 fn set_use_txn_boundary_changes_value() {
     binary_storage_tests::set_use_txn_boundary_changes_value(

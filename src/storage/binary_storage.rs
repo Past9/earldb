@@ -81,11 +81,13 @@ pub trait BinaryStorage {
     fn fill(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<(), Error>;
     fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error>;
 
+    /*
     fn get_use_txn_boundary(&self) -> bool;
     fn set_use_txn_boundary(&mut self, val: bool);
 
     fn get_txn_boundary(&self) -> Result<u64, Error>;
     fn set_txn_boundary(&mut self, offset: u64) -> Result<(), Error>;
+    */
 
     fn get_expand_size(&self) -> u64;
     fn set_expand_size(&mut self, expand_size: u64) -> Result<(), Error>;
