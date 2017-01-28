@@ -25,7 +25,6 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
         val_len: u32, 
         key_cmp: F
     ) -> BPTree<T, F> {
-        storage.set_use_txn_boundary(false);
         let bp_storage = BPStorage::new(storage, block_size, key_len, val_len);
 
         BPTree {

@@ -5,12 +5,21 @@ use storage::journal;
 use storage::journal::Journal;
 use storage::binary_storage;
 use storage::binary_storage::BinaryStorage;
+use storage::transactional_storage;
+use storage::transactional_storage::TransactionalStorage;
 use storage::memory_binary_storage::MemoryBinaryStorage;
+
+fn new_storage(
+    initial_capacity: u64, 
+    expand_size: u64
+) -> TransactionalStorage<MemoryBinaryStorage> {
+    TransactionalStorage::new(MemoryBinaryStorage::new(initial_capacity, expand_size).unwrap())
+}
 
 // new() tests
 #[test]
 pub fn mem_new_reads_and_writes_from_0_when_empty_storage() {
-    let j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let j = Journal::new(new_storage(256, 256));
     assert_eq!(0, j.read_offset());
     assert_eq!(0, j.write_offset());
 }
@@ -19,13 +28,13 @@ pub fn mem_new_reads_and_writes_from_0_when_empty_storage() {
 // open(), close(), verify(), and is_open() tests
 #[test]
 pub fn is_closed_by_default() {
-    let j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let j = Journal::new(new_storage(256, 256));
     assert!(!j.is_open());
 }
 
 #[test]
 pub fn close_returns_err_when_already_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.close().unwrap_err().description()
@@ -34,13 +43,13 @@ pub fn close_returns_err_when_already_closed() {
 
 #[test]
 pub fn open_returns_ok_when_previously_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert!(j.open().is_ok());
 }
 
 #[test]
 pub fn open_returns_err_when_previously_open() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_OPEN,
@@ -50,7 +59,7 @@ pub fn open_returns_err_when_previously_open() {
 
 #[test]
 pub fn open_and_verify_counts_existing_records() {
-    let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+    let mut s = new_storage(256, 256);
     s.open().unwrap();
     s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
     s.close().unwrap();
@@ -61,7 +70,7 @@ pub fn open_and_verify_counts_existing_records() {
 
 #[test]
 pub fn open_and_verify_does_not_count_uncommitted_records() {
-    let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+    let mut s = new_storage(256, 256);
     s.open().unwrap();
     s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
     s.w_bytes(12, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0]).unwrap();
@@ -73,7 +82,7 @@ pub fn open_and_verify_does_not_count_uncommitted_records() {
 
 #[test]
 pub fn open_and_verify_returns_err_on_bad_checksum() {
-    let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+    let mut s = new_storage(256, 256);
     s.open().unwrap();
     s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x1, 0x3, 0x3]).unwrap();
     s.close().unwrap();
@@ -86,7 +95,7 @@ pub fn open_and_verify_returns_err_on_bad_checksum() {
 
 #[test]
 pub fn open_and_verify_recognizes_all_committed_records() {
-    let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+    let mut s = new_storage(256, 256);
     s.open().unwrap();
     s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
     s.close().unwrap();
@@ -97,7 +106,7 @@ pub fn open_and_verify_recognizes_all_committed_records() {
 
 #[test]
 pub fn open_and_verify_recognizes_uncommitted_record() {
-    let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+    let mut s = new_storage(256, 256);
     s.open().unwrap();
     s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
     s.close().unwrap();
@@ -108,7 +117,7 @@ pub fn open_and_verify_recognizes_uncommitted_record() {
 
 #[test]
 pub fn open_and_verify_allows_record_commit() {
-    let mut s = MemoryBinaryStorage::new(256, 256, false).unwrap();
+    let mut s = new_storage(256, 256);
     s.open().unwrap();
     s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
     s.w_bytes(12, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0]).unwrap();
@@ -124,21 +133,21 @@ pub fn open_and_verify_allows_record_commit() {
 
 #[test]
 pub fn close_returns_ok_when_previously_open() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert!(j.close().is_ok());
 }
 
 #[test]
 pub fn is_open_after_open() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert!(j.is_open());
 }
 
 #[test]
 pub fn is_closed_after_open_and_close() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.close().unwrap();
     assert!(!j.is_open());
@@ -147,7 +156,7 @@ pub fn is_closed_after_open_and_close() {
 // write(), commit(), and discard() tests
 #[test]
 pub fn write_returns_err_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.write(&[0x0, 0x1, 0x2]).unwrap_err().description()
@@ -156,14 +165,14 @@ pub fn write_returns_err_when_closed() {
 
 #[test]
 pub fn write_returns_ok_when_open() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert!(j.write(&[0x0, 0x1, 0x2]).is_ok());
 }
 
 #[test]
 pub fn write_returns_err_when_uncommitted_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(
@@ -174,7 +183,7 @@ pub fn write_returns_err_when_uncommitted_data() {
 
 #[test]
 pub fn write_returns_ok_after_commit() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -183,7 +192,7 @@ pub fn write_returns_ok_after_commit() {
 
 #[test]
 pub fn commit_returns_err_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.close().unwrap();
@@ -195,7 +204,7 @@ pub fn commit_returns_err_when_closed() {
 
 #[test]
 pub fn commit_returns_err_when_no_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(
         journal::ERR_WRITE_NOT_IN_PROGRESS,
@@ -205,7 +214,7 @@ pub fn commit_returns_err_when_no_data() {
 
 #[test]
 pub fn commit_returns_ok_when_uncommitted_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert!(j.commit().is_ok());
@@ -213,7 +222,7 @@ pub fn commit_returns_ok_when_uncommitted_data() {
 
 #[test]
 pub fn discard_returns_err_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.close().unwrap();
@@ -225,7 +234,7 @@ pub fn discard_returns_err_when_closed() {
 
 #[test]
 pub fn discard_returns_ok_when_uncommitted_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert!(j.discard().is_ok());
@@ -233,7 +242,7 @@ pub fn discard_returns_ok_when_uncommitted_data() {
 
 #[test]
 pub fn discard_returns_err_when_no_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(
         journal::ERR_WRITE_NOT_IN_PROGRESS,
@@ -243,7 +252,7 @@ pub fn discard_returns_err_when_no_data() {
 
 #[test]
 pub fn write_returns_ok_after_discard() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.discard().unwrap();
@@ -254,20 +263,20 @@ pub fn write_returns_ok_after_discard() {
 // is_writing() tests
 #[test]
 pub fn is_not_writing_when_new() {
-    let j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let j = Journal::new(new_storage(256, 256));
     assert!(!j.is_writing());
 }
 
 #[test]
 pub fn is_not_writing_when_newly_opened() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert!(!j.is_writing());
 }
 
 #[test]
 pub fn is_writing_after_write() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert!(j.is_writing());
@@ -275,7 +284,7 @@ pub fn is_writing_after_write() {
 
 #[test]
 pub fn is_not_writing_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.close().unwrap();
@@ -284,7 +293,7 @@ pub fn is_not_writing_when_closed() {
 
 #[test]
 pub fn is_writing_when_reopened_before_commit() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.close().unwrap();
@@ -294,7 +303,7 @@ pub fn is_writing_when_reopened_before_commit() {
 
 #[test]
 pub fn is_not_writing_after_commit() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -303,7 +312,7 @@ pub fn is_not_writing_after_commit() {
 
 #[test]
 pub fn is_not_writing_after_discard() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.discard().unwrap();
@@ -313,7 +322,7 @@ pub fn is_not_writing_after_discard() {
 // has_start() tests
 #[test]
 pub fn has_start_returns_err_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.has_start().unwrap_err().description()
@@ -322,17 +331,17 @@ pub fn has_start_returns_err_when_closed() {
 
 #[test]
 pub fn has_start_returns_err_when_past_txn_boundary() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(
-        binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
         j.has_start().unwrap_err().description()
     );
 }
 
 #[test]
 pub fn has_start_returns_ok_when_open() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -341,7 +350,7 @@ pub fn has_start_returns_ok_when_open() {
 
 #[test]
 pub fn has_start_returns_true_when_record_exists() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -351,7 +360,7 @@ pub fn has_start_returns_true_when_record_exists() {
 // has_end() tests
 #[test]
 pub fn has_end_returns_err_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.has_end().unwrap_err().description()
@@ -360,17 +369,17 @@ pub fn has_end_returns_err_when_closed() {
 
 #[test]
 pub fn has_end_returns_err_when_past_txn_boundary() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(
-        binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
         j.has_end().unwrap_err().description()
     );
 }
 
 #[test]
 pub fn has_end_returns_true_when_record_is_committed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -380,7 +389,7 @@ pub fn has_end_returns_true_when_record_is_committed() {
 // read() tests
 #[test]
 pub fn read_returns_err_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.read().unwrap_err().description()
@@ -389,28 +398,28 @@ pub fn read_returns_err_when_closed() {
 
 #[test]
 pub fn read_returns_err_when_no_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(
-        binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
         j.read().unwrap_err().description()
     );
 }
 
 #[test]
 pub fn read_returns_err_when_uncommitted_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(
-        binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
         j.read().unwrap_err().description()
     );
 }
 
 #[test]
 pub fn read_returns_ok_when_committed_data() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -419,7 +428,7 @@ pub fn read_returns_ok_when_committed_data() {
 
 #[test]
 pub fn read_returns_first_record() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -428,7 +437,7 @@ pub fn read_returns_first_record() {
 
 #[test]
 pub fn read_returns_record_multiple_times() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -439,7 +448,7 @@ pub fn read_returns_record_multiple_times() {
 // jump_to() tests
 #[test]
 pub fn jump_to_returns_err_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.jump_to(6).unwrap_err().description()
@@ -448,17 +457,17 @@ pub fn jump_to_returns_err_when_closed() {
 
 #[test]
 pub fn jump_to_returns_err_when_past_txn_boundary() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(
-        binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
         j.jump_to(6).unwrap_err().description()
     );
 }
 
 #[test]
 pub fn jump_to_returns_ok_when_at_record_start() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -469,7 +478,7 @@ pub fn jump_to_returns_ok_when_at_record_start() {
 
 #[test]
 pub fn jump_to_returns_err_when_not_at_record_start() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -483,20 +492,20 @@ pub fn jump_to_returns_err_when_not_at_record_start() {
 
 #[test]
 pub fn jump_to_returns_err_when_at_uncommitted_record_start() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
     j.write(&[0x3, 0x4, 0x5]).unwrap();
     assert_eq!(
-        binary_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
         j.jump_to(12).unwrap_err().description()
     );
 }
 
 #[test]
 pub fn jump_to_still_jumps_when_err() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -507,7 +516,7 @@ pub fn jump_to_still_jumps_when_err() {
 
 #[test]
 pub fn jump_to_jumps_when_complete_record() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -519,7 +528,7 @@ pub fn jump_to_jumps_when_complete_record() {
 
 #[test]
 pub fn jump_to_allows_record_read_at_jump_location() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -533,7 +542,7 @@ pub fn jump_to_allows_record_read_at_jump_location() {
 // reset() tests
 #[test]
 pub fn reset_does_not_change_read_offset_when_already_0() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert_eq!(0, j.read_offset());
     j.reset();
@@ -542,7 +551,7 @@ pub fn reset_does_not_change_read_offset_when_already_0() {
 
 #[test]
 pub fn reset_changes_read_offset_to_0() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -557,7 +566,7 @@ pub fn reset_changes_read_offset_to_0() {
 
 #[test]
 pub fn reset_allows_reading_from_first_record() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -573,20 +582,20 @@ pub fn reset_allows_reading_from_first_record() {
 // next() tests
 #[test]
 pub fn next_returns_none_when_closed() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     assert!(j.next().is_none());
 }
 
 #[test]
 pub fn next_returns_none_when_no_records() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     assert!(j.next().is_none());
 }
 
 #[test]
 pub fn next_returns_records_in_order() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -598,7 +607,7 @@ pub fn next_returns_records_in_order() {
 
 #[test]
 pub fn next_returns_none_when_no_more_records_available() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -608,7 +617,7 @@ pub fn next_returns_none_when_no_more_records_available() {
 
 #[test]
 pub fn next_returns_records_as_they_become_available() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -623,13 +632,13 @@ pub fn next_returns_records_as_they_become_available() {
 // read_offset() tests
 #[test]
 pub fn read_offset_starts_at_0() {
-    let j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let j = Journal::new(new_storage(256, 256));
     assert_eq!(0, j.read_offset());
 }
 
 #[test]
 pub fn read_offset_moves_on_next() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -640,7 +649,7 @@ pub fn read_offset_moves_on_next() {
 
 #[test]
 pub fn read_offset_resets_after_reopening() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     j.commit().unwrap();
@@ -654,13 +663,13 @@ pub fn read_offset_resets_after_reopening() {
 // write_offset() tests
 #[test]
 pub fn write_offset_starts_at_0() {
-    let j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let j = Journal::new(new_storage(256, 256));
     assert_eq!(0, j.read_offset());
 }
 
 #[test]
 pub fn write_offset_increases_on_write() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(10, j.write_offset());
@@ -668,7 +677,7 @@ pub fn write_offset_increases_on_write() {
 
 #[test]
 pub fn write_offset_increases_on_commit() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(10, j.write_offset());
@@ -678,7 +687,7 @@ pub fn write_offset_increases_on_commit() {
 
 #[test]
 pub fn write_offset_resets_on_discard() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(10, j.write_offset());
@@ -688,7 +697,7 @@ pub fn write_offset_resets_on_discard() {
 
 #[test]
 pub fn write_offset_goes_to_uncommitted_record_end_when_reopened_before_commit() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(256, 256, false).unwrap());
+    let mut j = Journal::new(new_storage(256, 256));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(10, j.write_offset());
@@ -700,7 +709,7 @@ pub fn write_offset_goes_to_uncommitted_record_end_when_reopened_before_commit()
 // capacity() tests
 #[test]
 pub fn capacity_returns_err_when_closed() {
-    let j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let j = Journal::new(new_storage(16, 16));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.capacity().unwrap_err().description()
@@ -709,21 +718,21 @@ pub fn capacity_returns_err_when_closed() {
 
 #[test]
 pub fn capacity_returns_ok_when_open() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let mut j = Journal::new(new_storage(16, 16));
     j.open().unwrap();
     assert!(j.capacity().is_ok());
 }
 
 #[test]
 pub fn capacity_returns_initial_capacity() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let mut j = Journal::new(new_storage(16, 16));
     j.open().unwrap();
     assert_eq!(16, j.capacity().unwrap());
 }
 
 #[test]
 pub fn capacity_returns_expanded_capacity() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let mut j = Journal::new(new_storage(16, 16));
     j.open().unwrap();
     assert_eq!(16, j.capacity().unwrap());
     j.write(&[0x0, 0x1, 0x2]).unwrap();
@@ -737,7 +746,7 @@ pub fn capacity_returns_expanded_capacity() {
 // txn_boundary() tests
 #[test]
 pub fn txn_boundary_returns_err_when_closed() {
-    let j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let j = Journal::new(new_storage(16, 16));
     assert_eq!(
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
         j.txn_boundary().unwrap_err().description()
@@ -746,14 +755,14 @@ pub fn txn_boundary_returns_err_when_closed() {
 
 #[test]
 pub fn txn_boundary_starts_at_0() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let mut j = Journal::new(new_storage(16, 16));
     j.open().unwrap();
     assert_eq!(0, j.txn_boundary().unwrap());
 }
 
 #[test]
 pub fn txn_boundary_does_not_advance_on_write() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let mut j = Journal::new(new_storage(16, 16));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(0, j.txn_boundary().unwrap());
@@ -761,7 +770,7 @@ pub fn txn_boundary_does_not_advance_on_write() {
 
 #[test]
 pub fn txn_boundary_advances_on_commit() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let mut j = Journal::new(new_storage(16, 16));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(0, j.txn_boundary().unwrap());
@@ -771,7 +780,7 @@ pub fn txn_boundary_advances_on_commit() {
 
 #[test]
 pub fn txn_boundary_does_not_advance_on_discard() {
-    let mut j = Journal::new(MemoryBinaryStorage::new(16, 16, false).unwrap());
+    let mut j = Journal::new(new_storage(16, 16));
     j.open().unwrap();
     j.write(&[0x0, 0x1, 0x2]).unwrap();
     assert_eq!(0, j.txn_boundary().unwrap());

@@ -12,18 +12,10 @@ pub static ERR_INITIAL_CAP_NOT_POWER_OF_2: &'static str =
     "Initial capacity must be a power of 2";
 pub static ERR_EXPAND_SIZE_NOT_POWER_OF_2: &'static str = 
     "Expansion size must be a power of 2";
-pub static ERR_WRITE_BEFORE_TXN_BOUNDARY: & 'static str = 
-    "Cannot write before transaction boundary";
 pub static ERR_WRITE_PAST_END: & 'static str = 
     "Cannot write past end of allocated storage";
-pub static ERR_READ_AFTER_TXN_BOUNDARY: & 'static str = 
-    "Cannot read after transaction boundary";
 pub static ERR_READ_PAST_END: & 'static str = 
     "Cannot read past end of allocated storage";
-pub static ERR_OPERATION_INVALID_WHEN_NOT_USING_TXN_BOUNDARY: & 'static str = 
-    "Cannot perform this operation when transaction boundary is not in use";
-pub static ERR_SET_TXN_BOUNDARY_PAST_END: & 'static str = 
-    "Cannot set transaction boundary past end of allocated storage";
 pub static ERR_OPERATION_INVALID_WHEN_OPEN: & 'static str = 
     "Cannot perform this operation when storage is open";
 pub static ERR_OPERATION_INVALID_WHEN_CLOSED: & 'static str = 
@@ -80,14 +72,6 @@ pub trait BinaryStorage {
 
     fn fill(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<(), Error>;
     fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error>;
-
-    /*
-    fn get_use_txn_boundary(&self) -> bool;
-    fn set_use_txn_boundary(&mut self, val: bool);
-
-    fn get_txn_boundary(&self) -> Result<u64, Error>;
-    fn set_txn_boundary(&mut self, offset: u64) -> Result<(), Error>;
-    */
 
     fn get_expand_size(&self) -> u64;
     fn set_expand_size(&mut self, expand_size: u64) -> Result<(), Error>;

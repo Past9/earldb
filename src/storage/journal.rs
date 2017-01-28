@@ -2,7 +2,9 @@ use std::mem;
 
 use error::{ Error, AssertionError };
 use storage::binary_storage::BinaryStorage;
+use storage::transactional_storage::TransactionalStorage;
 use storage::util::xor_checksum;
+use storage::binary_storage;
 
 pub static ERR_WRITE_IN_PROGRESS: & 'static str =
     "Cannot perform this operation while an uncommitted write is in progress";
@@ -21,7 +23,7 @@ pub const PRE_DATA_LEN: u64 = 6;
 pub const POST_DATA_LEN: u64 = 3;
 
 pub struct Journal<T: BinaryStorage + Sized> {
-    storage: T,
+    storage: TransactionalStorage<T>,
     read_offset: u64,
     write_offset: u64,
     is_writing: bool,
@@ -30,8 +32,7 @@ pub struct Journal<T: BinaryStorage + Sized> {
 }
 impl<T: BinaryStorage + Sized> Journal<T> {
 
-    pub fn new(mut storage: T) -> Journal<T> {
-        storage.set_use_txn_boundary(true);
+    pub fn new(mut storage: TransactionalStorage<T>) -> Journal<T> {
         Journal {
             storage: storage,
             read_offset: 0,
@@ -69,11 +70,11 @@ impl<T: BinaryStorage + Sized> Journal<T> {
 
         // Start at the beginning of storage
         self.reset();
-        
-        // Turn off the transaction boundary checking temporarily since we don't
-        // know where it is yet
-        self.storage.set_use_txn_boundary(false);
 
+        // Turn off transaction checking temporarily since we don't
+        // know where the boundary is yet
+        self.storage.set_check_on_read(false);
+        
         // Count all the good committed records
         let mut count = 0;
         for _ in self.into_iter() {
@@ -81,13 +82,12 @@ impl<T: BinaryStorage + Sized> Journal<T> {
         }
         self.record_count = count;
 
-
-        // Check to see if the start byte exists. If an error occurs during the check,
-        // turn the transaction boundary back on before returning the error
+        // check to see if the start marker exists. If an error occurs during the
+        // check, turn transaction checking back on before returning the error 
         let has_start = match self.has_start() {
             Ok(h) => h,
             Err(e) => {
-                self.storage.set_use_txn_boundary(true);
+                self.storage.set_check_on_read(true);
                 return Err(e);
             }
         };
@@ -96,7 +96,7 @@ impl<T: BinaryStorage + Sized> Journal<T> {
             let data = match self.read() {
                 Ok(d) => d,
                 Err(e) => {
-                    self.storage.set_use_txn_boundary(true);
+                    self.storage.set_check_on_read(true);
                     return Err(e);
                 }
             };
@@ -108,8 +108,7 @@ impl<T: BinaryStorage + Sized> Journal<T> {
             self.is_writing = true;
         }
 
-        self.storage.set_use_txn_boundary(true);
-
+        self.storage.set_check_on_read(true);
 
         // Reset to the beginning and return Ok
         self.reset();
@@ -189,16 +188,9 @@ impl<T: BinaryStorage + Sized> Journal<T> {
             }
         };
 
-        match self.storage.set_txn_boundary(self.write_offset) {
-            Ok(()) => {
-                self.uncommitted_size = 0;
-                self.is_writing = false;
-            },
-            Err(e) => match self.discard() {
-                Ok(()) => return Err(e),
-                Err(d) => return Err(d)
-            }
-        };
+        self.storage.set_txn_boundary(self.write_offset);
+        self.uncommitted_size = 0;
+        self.is_writing = false;
 
         self.record_count += 1;
 
@@ -209,15 +201,12 @@ impl<T: BinaryStorage + Sized> Journal<T> {
     pub fn discard(&mut self) -> Result<(), Error> {
         try!(AssertionError::assert(self.is_writing, ERR_WRITE_NOT_IN_PROGRESS));
 
-        match self.storage.set_txn_boundary(self.write_offset - self.uncommitted_size) {
-            Ok(()) => {
-                self.write_offset -= self.uncommitted_size;
-                self.uncommitted_size = 0;
-                self.is_writing = false;
-                Ok(())
-            },
-            Err(e) => Err(e)
-        }
+        self.storage.set_txn_boundary(self.write_offset - self.uncommitted_size);
+
+        self.write_offset -= self.uncommitted_size;
+        self.uncommitted_size = 0;
+        self.is_writing = false;
+        Ok(())
     }
 
     pub fn is_writing(&self) -> bool {
@@ -247,7 +236,10 @@ impl<T: BinaryStorage + Sized> Journal<T> {
     }
 
     pub fn read(&mut self) -> Result<Vec<u8>, Error> {
-        let len = try!(self.storage.r_u32(self.read_offset + mem::size_of::<u16>() as u64)) as usize;
+
+        let len = try!(
+            self.storage.r_u32(self.read_offset + mem::size_of::<u16>() as u64)
+        ) as usize;
         try!(AssertionError::assert(len > 1, ERR_NO_RECORD_DATA));
         let mut bytes = try!(self.storage.r_bytes(
             self.read_offset + PRE_DATA_LEN,
@@ -302,9 +294,11 @@ impl<T: BinaryStorage + Sized> Journal<T> {
 
     pub fn capacity(&self) -> Result<u64, Error> { self.storage.get_capacity() }
 
-    pub fn txn_boundary(&self) -> Result<u64, Error> { self.storage.get_txn_boundary() }
-
     pub fn record_count(&self) -> u64 { self.record_count }
+
+    pub fn txn_boundary(&self) -> Result<u64, Error> {
+        self.storage.get_txn_boundary()
+    }
 
 }
 impl<T: BinaryStorage + Sized> Iterator for Journal<T> {

@@ -15,7 +15,6 @@ pub struct BPStorage<T: BinaryStorage + Sized> {
 impl<T: BinaryStorage + Sized> BPStorage<T> {
 
     pub fn new(mut storage: T, block_size: u32, key_len: u32, val_len: u32) -> BPStorage<T> {
-        storage.set_use_txn_boundary(false);
         BPStorage {
             storage: storage,
             block_size: block_size,

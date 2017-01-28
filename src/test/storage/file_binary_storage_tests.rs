@@ -29,8 +29,7 @@ fn get_storage() -> (FileBinaryStorage, String) {
         256,
         16, 
         16,
-        512,
-        false
+        512
     ).unwrap();
     (s, path)
 }
@@ -43,8 +42,7 @@ fn get_storage_expand_size(expand_size: u64) -> (FileBinaryStorage, String) {
         256,
         16, 
         16,
-        expand_size,
-        false
+        expand_size
     ).unwrap();
     (s, path)
 }
@@ -68,8 +66,7 @@ pub fn open_creates_file_when_allowed_and_file_does_not_exist() {
         256,
         16, 
         16,
-        512,
-        false
+        512
     ).unwrap();
     assert!(!Path::new(path.clone().as_str()).exists());
     s.open().unwrap();
@@ -88,8 +85,7 @@ pub fn open_creates_file_with_initial_capacity() {
         256,
         16, 
         16,
-        512,
-        false
+        512
     ).unwrap();
     s.open().unwrap();
     s.close().unwrap();
@@ -112,8 +108,7 @@ pub fn open_returns_io_err_when_file_does_not_exist_and_creation_not_allowed() {
         256,
         16, 
         16,
-        512,
-        true
+        512
     ).unwrap();
     assert!(
         match s.open().unwrap_err() {
@@ -133,8 +128,7 @@ pub fn open_does_not_open_when_file_does_not_exist_and_creation_not_allowed() {
         256,
         16, 
         16,
-        512,
-        true
+        512
     ).unwrap();
     s.open().unwrap_err();
     assert!(!s.is_open());
@@ -150,8 +144,7 @@ pub fn open_does_not_create_file_when_not_allowed_and_file_does_not_exist() {
         256,
         16, 
         16,
-        512,
-        true
+        512
     ).unwrap();
     assert!(!Path::new(path.clone().as_str()).exists());
     s.open().unwrap_err();
@@ -224,13 +217,6 @@ fn w_i8_does_not_write_when_closed() {
 }
 
 #[test]
-fn w_i8_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_i8_does_not_write_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn w_i8_over_capacity_expands_storage() {
     let (s, p) = get_storage();
     binary_storage_tests::w_i8_over_capacity_expands_storage(s);
@@ -255,13 +241,6 @@ fn w_i16_returns_ok_when_open() {
 fn w_i16_does_not_write_when_closed() {
     let (s, p) = get_storage();
     binary_storage_tests::w_i16_does_not_write_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn w_i16_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_i16_does_not_write_before_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -294,13 +273,6 @@ fn w_i32_does_not_write_when_closed() {
 }
 
 #[test]
-fn w_i32_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_i32_does_not_write_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn w_i32_over_capacity_expands_storage() {
     let (s, p) = get_storage();
     binary_storage_tests::w_i32_over_capacity_expands_storage(s);
@@ -325,13 +297,6 @@ fn w_i64_returns_ok_when_open() {
 fn w_i64_does_not_write_when_closed() {
     let (s, p) = get_storage();
     binary_storage_tests::w_i64_does_not_write_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn w_i64_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_i64_does_not_write_before_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -364,13 +329,6 @@ fn w_u8_does_not_write_when_closed() {
 }
 
 #[test]
-fn w_u8_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_u8_does_not_write_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn w_u8_over_capacity_expands_storage() {
     let (s, p) = get_storage();
     binary_storage_tests::w_u8_over_capacity_expands_storage(s);
@@ -395,13 +353,6 @@ fn w_u16_returns_ok_when_open() {
 fn w_u16_does_not_write_when_closed() {
     let (s, p) = get_storage();
     binary_storage_tests::w_u16_does_not_write_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn w_u16_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_u16_does_not_write_before_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -434,13 +385,6 @@ fn w_u32_does_not_write_when_closed() {
 }
 
 #[test]
-fn w_u32_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_u32_does_not_write_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn w_u32_over_capacity_expands_storage() {
     let (s, p) = get_storage();
     binary_storage_tests::w_u32_over_capacity_expands_storage(s);
@@ -465,13 +409,6 @@ fn w_u64_returns_ok_when_open() {
 fn w_u64_does_not_write_when_closed() {
     let (s, p) = get_storage();
     binary_storage_tests::w_u64_does_not_write_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn w_u64_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_u64_does_not_write_before_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -504,13 +441,6 @@ fn w_f32_does_not_write_when_closed() {
 }
 
 #[test]
-fn w_f32_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_f32_does_not_write_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn w_f32_over_capacity_expands_storage() {
     let (s, p) = get_storage();
     binary_storage_tests::w_f32_over_capacity_expands_storage(s);
@@ -535,13 +465,6 @@ fn w_f64_returns_ok_when_open() {
 fn w_f64_does_not_write_when_closed() {
     let (s, p) = get_storage();
     binary_storage_tests::w_f64_does_not_write_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn w_f64_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_f64_does_not_write_before_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -574,13 +497,6 @@ fn w_bool_does_not_write_when_closed() {
 }
 
 #[test]
-fn w_bool_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_bool_does_not_write_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn w_bool_over_capacity_expands_storage() {
     let (s, p) = get_storage();
     binary_storage_tests::w_bool_over_capacity_expands_storage(s);
@@ -605,13 +521,6 @@ fn w_bytes_returns_ok_when_open() {
 fn w_bytes_does_not_write_when_closed() {
     let (s, p) = get_storage();
     binary_storage_tests::w_bytes_does_not_write_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn w_bytes_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_bytes_does_not_write_before_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -647,13 +556,6 @@ fn w_str_returns_ok_when_open() {
 fn w_str_does_not_write_when_closed() {
     let (s, p) = get_storage();
     binary_storage_tests::w_str_does_not_write_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn w_str_does_not_write_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::w_str_does_not_write_before_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -700,13 +602,6 @@ fn r_i8_reads_written_data() {
 }
 
 #[test]
-fn r_i8_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_i8_does_not_read_past_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn r_i8_does_not_read_past_capacity() {
     let (s, p) = get_storage();
     binary_storage_tests::r_i8_does_not_read_past_capacity(s);
@@ -745,13 +640,6 @@ fn r_i16_reads_zero_from_unwritten_storage() {
 fn r_i16_reads_written_data() {
     let (s, p) = get_storage();
     binary_storage_tests::r_i16_reads_written_data(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn r_i16_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_i16_does_not_read_past_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -798,13 +686,6 @@ fn r_i32_reads_written_data() {
 }
 
 #[test]
-fn r_i32_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_i32_does_not_read_past_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn r_i32_does_not_read_past_capacity() {
     let (s, p) = get_storage();
     binary_storage_tests::r_i32_does_not_read_past_capacity(s);
@@ -843,13 +724,6 @@ fn r_i64_reads_zero_from_unwritten_storage() {
 fn r_i64_reads_written_data() {
     let (s, p) = get_storage();
     binary_storage_tests::r_i64_reads_written_data(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn r_i64_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_i64_does_not_read_past_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -896,13 +770,6 @@ fn r_u8_reads_written_data() {
 }
 
 #[test]
-fn r_u8_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_u8_does_not_read_past_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn r_u8_does_not_read_past_capacity() {
     let (s, p) = get_storage();
     binary_storage_tests::r_u8_does_not_read_past_capacity(s);
@@ -941,13 +808,6 @@ fn r_u16_reads_zero_from_unwritten_storage() {
 fn r_u16_reads_written_data() {
     let (s, p) = get_storage();
     binary_storage_tests::r_u16_reads_written_data(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn r_u16_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_u16_does_not_read_past_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -994,13 +854,6 @@ fn r_u32_reads_written_data() {
 }
 
 #[test]
-fn r_u32_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_u32_does_not_read_past_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn r_u32_does_not_read_past_capacity() {
     let (s, p) = get_storage();
     binary_storage_tests::r_u32_does_not_read_past_capacity(s);
@@ -1039,13 +892,6 @@ fn r_u64_reads_zero_from_unwritten_storage() {
 fn r_u64_reads_written_data() {
     let (s, p) = get_storage();
     binary_storage_tests::r_u64_reads_written_data(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn r_u64_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_u64_does_not_read_past_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -1092,13 +938,6 @@ fn r_f32_reads_written_data() {
 }
 
 #[test]
-fn r_f32_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_f32_does_not_read_past_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn r_f32_does_not_read_past_capacity() {
     let (s, p) = get_storage();
     binary_storage_tests::r_f32_does_not_read_past_capacity(s);
@@ -1137,13 +976,6 @@ fn r_f64_reads_zero_from_unwritten_storage() {
 fn r_f64_reads_written_data() {
     let (s, p) = get_storage();
     binary_storage_tests::r_f64_reads_written_data(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn r_f64_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_f64_does_not_read_past_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -1190,13 +1022,6 @@ fn r_bool_reads_written_data() {
 }
 
 #[test]
-fn r_bool_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_bool_does_not_read_past_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn r_bool_does_not_read_past_capacity() {
     let (s, p) = get_storage();
     binary_storage_tests::r_bool_does_not_read_past_capacity(s);
@@ -1239,13 +1064,6 @@ fn r_bytes_reads_written_data() {
 }
 
 #[test]
-fn r_bytes_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_bytes_does_not_read_past_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
 fn r_bytes_does_not_read_past_capacity() {
     let (s, p) = get_storage();
     binary_storage_tests::r_bytes_does_not_read_past_capacity(s);
@@ -1284,13 +1102,6 @@ fn r_str_reads_nulls_from_unwritten_storage() {
 fn r_str_reads_written_data() {
     let (s, p) = get_storage();
     binary_storage_tests::r_str_reads_written_data(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn r_str_does_not_read_past_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::r_str_does_not_read_past_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -1361,34 +1172,6 @@ fn fill_returns_err_when_end_offset_is_before_start_offset() {
 fn fill_does_not_write_when_end_offset_is_before_start_offset() {
     let (s, p) = get_storage();
     binary_storage_tests::fill_does_not_write_when_end_offset_is_before_start_offset(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn fill_returns_err_when_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::fill_returns_err_when_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn fill_does_not_write_when_before_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::fill_does_not_write_when_before_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn fill_returns_ok_when_after_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::fill_returns_ok_when_after_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn fill_writes_when_after_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::fill_writes_when_after_txn_boundary(s);
     rm_tmp(p);
 }
 
@@ -1473,95 +1256,6 @@ fn is_filled_goes_to_end_offset() {
 fn is_filled_goes_to_end_when_end_offset_is_none() {
     let (s, p) = get_storage();
     binary_storage_tests::is_filled_goes_to_end_when_end_offset_is_none(s);
-    rm_tmp(p);
-}
-
-// get_use_txn_boundary(), set_use_txn_boundary(), get_txn_boundary(), and set_txn_boundary() tests
-#[test]
-fn set_use_txn_boundary_changes_value() {
-    let (s, _) = get_storage();
-    binary_storage_tests::set_use_txn_boundary_changes_value(s);
-}
-
-#[test]
-fn set_use_txn_boundary_resets_boundary_to_zero_when_txn_boundary_turned_off() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_use_txn_boundary_resets_boundary_to_zero_when_txn_boundary_turned_off(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn get_txn_boundary_returns_err_when_closed() {
-    let (s, _) = get_storage();
-    binary_storage_tests::get_txn_boundary_returns_err_when_closed(s);
-}
-
-#[test]
-fn get_txn_boundary_returns_err_when_not_using_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::get_txn_boundary_returns_err_when_not_using_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn get_txn_boundary_starts_at_0() {
-    let (s, p) = get_storage();
-    binary_storage_tests::get_txn_boundary_starts_at_0(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn set_txn_boundary_returns_err_when_not_using_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_txn_boundary_returns_err_when_not_using_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn set_txn_boundary_does_not_change_boundary_when_not_using_txn_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_txn_boundary_does_not_change_boundary_when_not_using_txn_boundary(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn set_txn_boundary_returns_err_when_closed() {
-    let (s, _) = get_storage();
-    binary_storage_tests::set_txn_boundary_returns_err_when_closed(s);
-}
-
-#[test]
-fn set_txn_boundary_does_not_change_boundary_when_closed() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_txn_boundary_does_not_change_boundary_when_closed(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn set_txn_boundary_returns_err_when_past_capacity() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_txn_boundary_returns_err_when_past_capacity(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn set_txn_boundary_does_not_change_boundary_when_past_capacity() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_txn_boundary_does_not_change_boundary_when_past_capacity(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn set_txn_boundary_does_not_expand_capacity_when_past_capacity() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_txn_boundary_does_not_expand_capacity_when_past_capacity(s);
-    rm_tmp(p);
-}
-
-#[test]
-fn set_txn_boundary_changes_boundary() {
-    let (s, p) = get_storage();
-    binary_storage_tests::set_txn_boundary_changes_boundary(s);
     rm_tmp(p);
 }
 
