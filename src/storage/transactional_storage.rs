@@ -253,16 +253,6 @@ impl<T: BinaryStorage + Sized> BinaryStorage for TransactionalStorage<T> {
     }
 
     fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error> {
-        match start {
-            None => try!(self.check_boundary_for_read(0, 1)),
-            Some(s) => try!(self.check_boundary_for_read(s, 1))
-        };
-
-        match end {
-            None => try!(self.check_boundary_for_read(try!(self.storage.get_capacity()) - 1, 1)),
-            Some(e) => try!(self.check_boundary_for_read(e - 1, 1))
-        };
-
         self.storage.is_filled(start, end, val)
     }
 

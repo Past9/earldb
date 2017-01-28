@@ -259,3 +259,166 @@ pub fn r_i64_does_not_read_past_txn_boundary() {
         s.r_i64(1).unwrap_err().description()
     );
 }
+
+#[test]
+pub fn r_u8_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(4).unwrap();
+    assert!(s.r_u8(3).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_u8(4).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_u16_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(4).unwrap();
+    assert!(s.r_u16(2).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_u16(3).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_u32_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_u32(4).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_u32(5).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_u64_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_u64(0).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_u64(1).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_f32_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_f32(4).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_f32(8).unwrap_err().description()
+    );
+
+}
+
+#[test]
+pub fn r_f64_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_f64(0).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_f64(8).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_bool_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_bool(7).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_bool(8).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_bytes_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_bytes(6, 2).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_bytes(7, 2).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn r_str_does_not_read_past_txn_boundary() {
+    let mut s = new_storage();
+    s.open().unwrap();
+    s.set_txn_boundary(8).unwrap();
+    assert!(s.r_str(6, 2).is_ok());
+    assert_eq!(
+        transactional_storage::ERR_READ_AFTER_TXN_BOUNDARY,
+        s.r_str(7, 2).unwrap_err().description()
+    );
+}
+
+#[test]
+pub fn fill_fails_when_explicitly_starting_before_txn_boundary() {
+    let mut s = new_storage();    
+    s.open().unwrap();
+    s.set_txn_boundary(10);
+    assert_eq!(
+        transactional_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
+        s.fill(Some(9), None, 0x1).unwrap_err().description()
+    );
+    assert!(s.is_filled(None, None, 0x0).unwrap());
+}
+
+#[test]
+pub fn fill_fails_when_implicitly_starting_before_txn_boundary() {
+    let mut s = new_storage();    
+    s.open().unwrap();
+    s.set_txn_boundary(10);
+    assert_eq!(
+        transactional_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
+        s.fill(None, None, 0x1).unwrap_err().description()
+    );
+    assert!(s.is_filled(None, None, 0x0).unwrap());
+}
+
+#[test]
+pub fn fill_writes_bytes_in_range() {
+    let mut s = new_storage();    
+    s.open().unwrap();
+    s.set_txn_boundary(10);
+    s.fill(Some(10), Some(20), 0x1).unwrap();
+    assert!(s.is_filled(None, Some(10), 0x0).unwrap());
+    assert!(s.is_filled(Some(10), Some(20), 0x1).unwrap());
+    assert!(s.is_filled(Some(20), None, 0x0).unwrap());
+}
+
+#[test]
+pub fn fill_writes_bytes_in_range_without_start() {
+    let mut s = new_storage();    
+    s.open().unwrap();
+    s.fill(None, Some(20), 0x1).unwrap();
+    assert!(s.is_filled(Some(0), Some(20), 0x1).unwrap());
+    assert!(s.is_filled(Some(20), None, 0x0).unwrap());
+}
+
+#[test]
+pub fn fill_writes_bytes_in_range_without_end() {
+    let mut s = new_storage();    
+    s.open().unwrap();
+    s.fill(Some(10), None, 0x1).unwrap();
+    assert!(s.is_filled(Some(0), Some(10), 0x0).unwrap());
+    assert!(s.is_filled(Some(10), None, 0x1).unwrap());
+}
+
