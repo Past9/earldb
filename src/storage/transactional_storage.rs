@@ -34,7 +34,7 @@ impl<T: BinaryStorage + Sized> TransactionalStorage<T> {
     fn check_boundary_for_write(&self, offset: u64) -> Result<(), Error> {
         Ok(try!(AssertionError::assert(
             !self.storage.is_open() || offset >= self.txn_boundary,
-            ERR_READ_AFTER_TXN_BOUNDARY
+            ERR_WRITE_BEFORE_TXN_BOUNDARY
         )))
     }
 
