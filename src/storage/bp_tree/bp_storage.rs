@@ -8,16 +8,16 @@ use storage::bp_tree::leaf_node::LeafNode;
 
 pub struct BPStorage<T: BinaryStorage + Sized> {
     storage: T,
-    block_size: u32,
-    key_len: u32,
-    val_len: u32
+    node_size: u64,
+    key_len: u8,
+    val_len: u8
 }
 impl<T: BinaryStorage + Sized> BPStorage<T> {
 
-    pub fn new(mut storage: T, block_size: u32, key_len: u32, val_len: u32) -> BPStorage<T> {
+    pub fn new(mut storage: T, node_size: u64, key_len: u8, val_len: u8) -> BPStorage<T> {
         BPStorage {
             storage: storage,
-            block_size: block_size,
+            node_size: node_size,
             key_len: key_len,
             val_len: val_len
         }
@@ -31,18 +31,18 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
         self.storage.close()
     }
 
-    pub fn read_node(&mut self, block: u32) -> Result<Node, Error> {
+    pub fn read_node(&mut self, node_ptr: u64) -> Result<Node, Error> {
         let data = try!(self.storage.r_bytes(
-            block as u64 * self.block_size as u64, 
-            self.block_size as usize
+            node_ptr, 
+            self.node_size as usize
         ));
-        Node::from_bytes(data.as_slice(), block, self.block_size, self.key_len, self.val_len)
+        Node::from_bytes(data.as_slice(), node_ptr, self.key_len, self.val_len)
     }
 
     pub fn save_leaf(&mut self, node: LeafNode) -> Result<(), Error> {
         let data = try!(node.to_bytes());
         self.storage.w_bytes(
-            node.block() as u64 * self.block_size as u64, 
+            node.node_ptr(), 
             data.as_slice()
         )
     }
@@ -50,7 +50,7 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
     pub fn save_inner(&mut self, node: InnerNode) -> Result<(), Error> {
         let data = try!(node.to_bytes());
         self.storage.w_bytes(
-            node.block() as u64 * self.block_size as u64, 
+            node.node_ptr(), 
             data.as_slice()
         )
     }

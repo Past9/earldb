@@ -11,25 +11,25 @@ pub static ERR_NODE_CORRUPTED: & 'static str = "Node data corrupted";
 
 pub struct BPTree<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> {
     storage: BPStorage<T>,
-    block_size: u32,
-    key_len: u32,
-    val_len: u32,
+    node_size: u64,
+    key_len: u8,
+    val_len: u8,
     key_cmp: F // returns true if GTE
 }
 impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
 
     pub fn new(
         mut storage: T, 
-        block_size: u32, 
-        key_len: u32, 
-        val_len: u32, 
+        node_size: u64, 
+        key_len: u8, 
+        val_len: u8, 
         key_cmp: F
     ) -> BPTree<T, F> {
-        let bp_storage = BPStorage::new(storage, block_size, key_len, val_len);
+        let bp_storage = BPStorage::new(storage, node_size, key_len, val_len);
 
         BPTree {
             storage: bp_storage,
-            block_size: block_size,
+            node_size: node_size,
             key_len: key_len,
             val_len: val_len,
             key_cmp: key_cmp
@@ -46,10 +46,12 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
         self.storage.close()
     }
 
+    /*
     pub fn search(&mut self, k: &[u8]) -> Result<LeafNode, Error> {
         let root = try!(self.storage.read_node(1));
         self.tree_search(k, root)
     }
+    */
 
     fn is_in_range(&self, k: &[u8], r: &InnerNodeRecord) -> Result<bool, Error> {
         match r.min_key {
@@ -64,7 +66,17 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
         }
     }
 
+    /*
     fn tree_search(&mut self, k: &[u8], node: Node) -> Result<LeafNode, Error> {
+        match node {
+            Node::leaf(l) => Ok(l),
+            Node::Inner(i) => {
+                len 
+
+
+            }
+        }
+
         let inner = match node {
             Node::Leaf(n) => { return Ok(n) },
             Node::Inner(n) => n 
@@ -81,5 +93,6 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
 
         return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)));
     }
+    */
 
 }

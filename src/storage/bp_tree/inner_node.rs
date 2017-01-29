@@ -1,4 +1,5 @@
-use std::io::Cursor;
+use std::mem::size_of;
+use std::io::{ Read, Cursor };
 use std::ops::Index;
 
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
@@ -6,98 +7,106 @@ use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 use error::{ Error, AssertionError };
 use storage::bp_tree::node;
 
-pub static ERR_INVALID_BLOCK_NUM: & 'static str = "Invalid block number";
-
 const NODE_TYPE_OFFSET: usize = 0;
-const PARENT_OFFSET: usize = 1;
-const LEN_OFFSET: usize = 5;
-const RECORDS_OFFSET: usize = 9;
+const NODE_TYPE_LEN: usize = 1; // u8 size
+const PARENT_PTR_OFFSET: usize = 1; // NODE_TYPE_OFFSET + NODE_TYPE_LEN
+const PARENT_PTR_LEN: usize = 8; // u64 size
+const RECORDS_LEN_OFFSET: usize = 9; // # all record bytes, PARENT_PTR_OFFSET + PARENT_PTR_LEN
+const RECORDS_LEN_SIZE: usize = 4; // u32 size
+const RECORD_START_OFFSET: usize = 9; // Start of records, RECORDS_LEN_OFFSET + RECORDS_LEN_SIZE
+const PTR_LEN: usize = 8; // u64 size
 
 pub struct InnerNode {
-    block: u32,
-    block_size: u32,
-    len: u32,
-    parent: u32,
-    keys: Vec<Vec<u8>>,
-    pointers: Vec<u32>,
-    key_len: u32
+    node_ptr: u64, // Pointer to beginning of node data
+    parent_ptr: u64, // Pointer to parent node 
+    node_size: u32, // Size in bytes of the entire node, used or not
+    keys: Vec<Vec<u8>>, // List of keys
+    pointers: Vec<u64>, // List of pointers to left and right of keys 
+    key_len: u8 // Length in bytes of a single key
 }
 impl InnerNode {
 
     pub fn from_bytes(
         data: &[u8],
-        block: u32,
-        block_size: u32,
-        key_len: u32
+        node_ptr: u64,
+        key_len: u8
     ) -> Result<InnerNode, Error> {
 
-        let parent_buf = &data[PARENT_OFFSET..(PARENT_OFFSET + 4)];
-        let mut parent_rdr = Cursor::new(parent_buf);
-        let parent = try!(parent_rdr.read_u32::<LittleEndian>());
+        let node_size = data.len() as u32;
+        try!(AssertionError::assert(
+            node_size >= RECORD_START_OFFSET as u32, 
+            node::ERR_BLOCK_SIZE_TOO_SMALL
+        ));
 
-        let len_buf = &data[LEN_OFFSET..(LEN_OFFSET + 4)];
-        let mut len_rdr = Cursor::new(len_buf);
-        let len = try!(len_rdr.read_u32::<LittleEndian>());
+        let mut reader = Cursor::new(data);
+        reader.set_position(1);
+
+        let parent_ptr = try!(reader.read_u64::<LittleEndian>());
+        let records_len = try!(reader.read_u32::<LittleEndian>());
+
+        let mut next_is_ptr = true;
+        let mut cur_pos: u64 = RECORD_START_OFFSET as u64;
 
         let mut keys = Vec::new();
         let mut pointers = Vec::new();
 
-        let rec_len = (key_len + 4) as usize;
-        for i in 0..len {
-            let p_offset = RECORDS_OFFSET + rec_len * i as usize;
-            let k_offset = p_offset + 4;
-
-            let p_buf = &data[p_offset..(p_offset + 4)];
-            let mut p_rdr = Cursor::new(p_buf);
-            pointers.push(try!(p_rdr.read_u32::<LittleEndian>()));
-
-            keys.push(data[k_offset..(k_offset + key_len as usize)].to_vec());
+        // Loop as long as we still have room to read the next key or pointer
+        while match next_is_ptr {
+            true => cur_pos < RECORD_START_OFFSET as u64 + records_len as u64 - PTR_LEN as u64,
+            false => cur_pos < RECORD_START_OFFSET as u64 + records_len as u64 - key_len as u64
+        } {
+            let mut rec_reader = Cursor::new(data);
+            rec_reader.set_position(cur_pos);
+            match next_is_ptr {
+                true => pointers.push(try!(rec_reader.read_u64::<LittleEndian>())),
+                false => {
+                    let mut buf = vec![];
+                    try!(rec_reader.take(key_len as u64).read_to_end(&mut buf));
+                    keys.push(buf);
+                }
+            };
+            next_is_ptr = !next_is_ptr;
+            cur_pos = reader.position();
         }
 
-        let final_p_offset = RECORDS_OFFSET + rec_len * (len as usize + 1);
-        let p_buf = &data[final_p_offset..(final_p_offset + 4)];
-        let mut p_rdr = Cursor::new(p_buf);
-        pointers.push(try!(p_rdr.read_u32::<LittleEndian>()));
-
         Ok(InnerNode {
-            block: block,
-            block_size: block_size,
-            len: len,
-            parent: parent,
+            node_ptr: node_ptr,
+            parent_ptr: parent_ptr,
+            node_size: node_size,
             keys: keys,
             pointers: pointers,
             key_len: key_len
         })
-
     }
 
     pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         unimplemented!();
     }
 
-    pub fn block(&self) -> u32 { self.block }
+    pub fn node_ptr(&self) -> u64 { self.node_ptr }
 
-    pub fn has_parent(&self) -> bool { self.parent != 0 }
+    pub fn has_parent(&self) -> bool { self.parent_ptr != 0 }
 
-    pub fn parent(&self) -> Option<u32> {
-        match self.parent {
+    pub fn parent_ptr(&self) -> Option<u64> {
+        match self.parent_ptr {
             0 => None,
-            _ => Some(self.parent)
+            _ => Some(self.parent_ptr)
         }
     }
 
-    pub fn link_parent(&mut self, block: u32) -> Result<(), Error> {
-        try!(AssertionError::assert_not(block == 0, ERR_INVALID_BLOCK_NUM));
-        self.parent = block;
+    pub fn link_parent(&mut self, parent_ptr: u64) -> Result<(), Error> {
+        try!(AssertionError::assert_not(parent_ptr == 0, node::ERR_INVALID_BLOCK_NUM));
+        self.parent_ptr = parent_ptr;
         Ok(())
     }
 
     pub fn unlink_parent(&mut self) {
-        self.parent = 0;
+        self.parent_ptr = 0;
     }
 
-    pub fn len(&self) -> u32 {
-        self.len
+
+    pub fn len(&self) -> usize {
+        self.keys.len()
     }
 
 }
@@ -115,19 +124,19 @@ impl IntoIterator for InnerNode {
 
 pub struct InnerNodeIterator {
     node: InnerNode,
-    current: u32
+    current: usize
 }
 impl Iterator for InnerNodeIterator {
 
     type Item = InnerNodeRecord;
 
     fn next(&mut self) -> Option<InnerNodeRecord> {
-        if self.current < self.node.len {
-            let i = self.current as usize;
+        if self.current < self.node.len() {
+            let i = self.current;
             self.current += 1;
 
             let is_first = i == 0;
-            let is_last = i < self.node.len as usize - 1;
+            let is_last = i < self.node.len() as usize - 1;
 
             Some(InnerNodeRecord {
                 min_key: match is_first {
@@ -140,14 +149,6 @@ impl Iterator for InnerNodeIterator {
                 },
                 pointer: self.node.pointers[i] 
             })
-
-            /*
-            Some(InnerNodeRecord {
-                key: self.node.keys[i].clone(),
-                lt_pointer: self.node.pointers[i].clone(),
-                gte_pointer: self.node.pointers[i + 1].clone(),
-            })
-            */
         } else {
             None
         }
@@ -159,6 +160,6 @@ impl Iterator for InnerNodeIterator {
 pub struct InnerNodeRecord {
     pub min_key: Option<Vec<u8>>,
     pub max_key: Option<Vec<u8>>,
-    pub pointer: u32,
+    pub pointer: u64,
 }
 

@@ -1,152 +1,164 @@
-use std::io::Cursor;
+use std::io::{ Read, Cursor };
 
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
 use error::{ Error, AssertionError };
 use storage::bp_tree::node;
 
-pub static ERR_INVALID_BLOCK_NUM: & 'static str = "Invalid block number";
-
 const NODE_TYPE_OFFSET: usize = 0;
-const PARENT_OFFSET: usize = 1;
-const PREV_OFFSET: usize = 5;
-const NEXT_OFFSET: usize = 9;
-const LEN_OFFSET: usize = 13;
-const RECORDS_OFFSET: usize = 17;
+const NODE_TYPE_LEN: usize = 1; // u8 size
+const PARENT_PTR_OFFSET: usize = 1; // NODE_TYPE_OFFSET + NODE_TYPE_LEN
+const PARENT_PTR_LEN: usize = 8; // u64 size
+const PREV_PTR_OFFSET: usize = 9; // PARENT_PTR_OFFSET + PARENT_PTR_LEN
+const PREV_PTR_LEN: usize = 8; // u64 size
+const NEXT_PTR_OFFSET: usize = 17; // PREV_PTR_OFFSET + PREV_PTR_LEN
+const NEXT_PTR_LEN: usize = 8; // u64 size
+const RECORDS_LEN_OFFSET: usize = 25; // # all record bytes, NEXT_PTR_OFFSET + NEXT_PTR_LEN
+const RECORDS_LEN_SIZE: usize = 4; // u32 size
+const RECORD_START_OFFSET: usize = 29; // Start of records, RECORDS_LEN_OFFSET + RECORDS_LEN_SIZE
 
 pub struct LeafNode {
-    block: u32,
-    block_size: u32,
-    len: u32,
-    parent: u32,
-    prev: u32,
-    next: u32,
+    node_ptr: u64,
+    parent_ptr: u64,
+    node_size: u32,
     keys: Vec<Vec<u8>>,
-    values: Vec<Vec<u8>>,
-    key_len: u32,
-    val_len: u32
+    vals: Vec<Vec<u8>>,
+    key_len: u8,
+    val_len: u8,
+    prev_ptr: u64,
+    next_ptr: u64
 }
 impl LeafNode {
 
     pub fn from_bytes(
         data: &[u8],
-        block: u32,
-        block_size: u32,
-        key_len: u32,
-        val_len: u32
+        node_ptr: u64,
+        key_len: u8,
+        val_len: u8
     ) -> Result<LeafNode, Error> {
 
-        let parent_buf = &data[PARENT_OFFSET..(PARENT_OFFSET + 4)];
-        let mut parent_rdr = Cursor::new(parent_buf);
-        let parent = try!(parent_rdr.read_u32::<LittleEndian>());
+        let node_size = data.len() as u32;
+        try!(AssertionError::assert(
+            node_size >= RECORD_START_OFFSET as u32, 
+            node::ERR_BLOCK_SIZE_TOO_SMALL
+        ));
 
-        let prev_buf = &data[PREV_OFFSET..(PREV_OFFSET + 4)];
-        let mut prev_rdr = Cursor::new(prev_buf);
-        let prev = try!(prev_rdr.read_u32::<LittleEndian>());
+        let mut reader = Cursor::new(data);
+        reader.set_position(1);
 
-        let next_buf = &data[NEXT_OFFSET..(NEXT_OFFSET + 4)];
-        let mut next_rdr = Cursor::new(next_buf);
-        let next = try!(next_rdr.read_u32::<LittleEndian>());
+        let parent_ptr = try!(reader.read_u64::<LittleEndian>());
+        let records_len = try!(reader.read_u32::<LittleEndian>());
+        let prev_ptr = try!(reader.read_u64::<LittleEndian>());
+        let next_ptr = try!(reader.read_u64::<LittleEndian>());
 
-        let len_buf = &data[LEN_OFFSET..(LEN_OFFSET + 4)];
-        let mut len_rdr = Cursor::new(len_buf);
-        let len = try!(len_rdr.read_u32::<LittleEndian>());
+        let mut cur_pos: u64 = RECORD_START_OFFSET as u64;
 
         let mut keys = Vec::new();
-        let mut values = Vec::new();
+        let mut vals = Vec::new();
 
-        let rec_len = (key_len + val_len) as usize;
-        for i in 0..len {
-            let k_offset = RECORDS_OFFSET + rec_len * i as usize;
-            let v_offset = k_offset + key_len as usize;
-            keys.push(data[k_offset..(k_offset + key_len as usize)].to_vec()); 
-            values.push(data[v_offset..(v_offset + val_len as usize)].to_vec()); 
+        while 
+            reader.position() < RECORD_START_OFFSET as u64 + 
+            records_len as u64 - 
+            val_len as u64 - 
+            key_len as u64 
+        {
+            let mut key_reader = Cursor::new(data);
+            key_reader.set_position(cur_pos);
+            let mut key_buf = vec![];
+            try!(key_reader.take(key_len as u64).read_to_end(&mut key_buf));
+            keys.push(key_buf);
+            cur_pos = cur_pos + key_len as u64;
+
+            let mut val_reader = Cursor::new(data);
+            val_reader.set_position(cur_pos);
+            let mut val_buf = vec![];
+            try!(val_reader.take(val_len as u64).read_to_end(&mut val_buf));
+            vals.push(val_buf);
+            cur_pos = cur_pos + val_len as u64;
         }
 
         Ok(LeafNode {
-            block: block,
-            block_size: block_size,
-            len: len,
-            parent: parent,
-            prev: prev,
-            next: next,
+            node_ptr: node_ptr,
+            parent_ptr: parent_ptr,
+            node_size: node_size,
             keys: keys,
-            values: values,
+            vals: vals,
             key_len: key_len,
-            val_len: val_len
+            val_len: val_len,
+            prev_ptr: prev_ptr,
+            next_ptr: next_ptr
         })
-
     }
 
     pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         unimplemented!();
     }
 
-    pub fn block(&self) -> u32 { self.block }
+    pub fn node_ptr(&self) -> u64 { self.node_ptr }
 
-    pub fn has_parent(&self) -> bool { self.parent != 0 }
-    pub fn has_prev(&self) -> bool { self.prev != 0 }
-    pub fn has_next(&self) -> bool { self.next != 0 }
+    pub fn has_parent(&self) -> bool { self.parent_ptr != 0 }
+    pub fn has_prev(&self) -> bool { self.prev_ptr != 0 }
+    pub fn has_next(&self) -> bool { self.next_ptr != 0 }
 
-    pub fn parent(&self) -> Option<u32> {
-        match self.parent {
+    pub fn parent_ptr(&self) -> Option<u64> {
+        match self.parent_ptr {
             0 => None,
-            _ => Some(self.parent)
+            _ => Some(self.parent_ptr)
         }
     }
 
-    pub fn prev(&self) -> Option<u32> {
-        match self.prev {
+    pub fn prev_ptr(&self) -> Option<u64> {
+        match self.prev_ptr {
             0 => None,
-            _ => Some(self.prev)
+            _ => Some(self.prev_ptr)
         }
     }
 
-    pub fn next(&self) -> Option<u32> {
-        match self.next {
+    pub fn next_ptr(&self) -> Option<u64> {
+        match self.next_ptr {
             0 => None,
-            _ => Some(self.next)
+            _ => Some(self.next_ptr)
         }
     }
 
-    pub fn link_parent(&mut self, block: u32) -> Result<(), Error> {
-        try!(AssertionError::assert_not(block == 0, ERR_INVALID_BLOCK_NUM));
-        self.parent = block;
+    pub fn link_parent(&mut self, parent_ptr: u64) -> Result<(), Error> {
+        try!(AssertionError::assert_not(parent_ptr == 0, node::ERR_INVALID_BLOCK_NUM));
+        self.parent_ptr = parent_ptr;
         Ok(())
     }
 
-    pub fn link_prev(&mut self, block: u32) -> Result<(), Error> {
-        try!(AssertionError::assert_not(block == 0, ERR_INVALID_BLOCK_NUM));
-        self.prev = block;
+    pub fn link_prev(&mut self, prev_ptr: u64) -> Result<(), Error> {
+        try!(AssertionError::assert_not(prev_ptr == 0, node::ERR_INVALID_BLOCK_NUM));
+        self.prev_ptr = prev_ptr;
         Ok(())
     }
 
-    pub fn link_next(&mut self, block: u32) -> Result<(), Error> {
-        try!(AssertionError::assert_not(block == 0, ERR_INVALID_BLOCK_NUM));
-        self.next = block;
+    pub fn link_next(&mut self, next_ptr: u64) -> Result<(), Error> {
+        try!(AssertionError::assert_not(next_ptr == 0, node::ERR_INVALID_BLOCK_NUM));
+        self.next_ptr = next_ptr;
         Ok(())
     }
 
     pub fn unlink_parent(&mut self) {
-        self.parent = 0;
+        self.parent_ptr = 0;
     }
 
     pub fn unlink_prev(&mut self) {
-        self.prev = 0;
+        self.prev_ptr = 0;
     }
 
     pub fn unlink_next(&mut self) {
-        self.next = 0;
+        self.next_ptr = 0;
     }
 
-    pub fn len(&self) -> u32 {
-        self.len
+    pub fn len(&self) -> usize {
+        self.keys.len()
     }
 
 }
 impl IntoIterator for LeafNode {
 
-    type Item = (Vec<u8>, Vec<u8>);
+    type Item = LeafNodeRecord;
     type IntoIter = LeafNodeIterator;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -158,23 +170,28 @@ impl IntoIterator for LeafNode {
 
 pub struct LeafNodeIterator {
     node: LeafNode,
-    current: u32
+    current: usize
 }
 impl Iterator for LeafNodeIterator {
 
-    type Item = (Vec<u8>, Vec<u8>);
+    type Item = LeafNodeRecord;
 
-    fn next(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
-        if self.current < self.node.len {
+    fn next(&mut self) -> Option<LeafNodeRecord> {
+        if self.current < self.node.len() {
             let i = self.current as usize;
             self.current += 1;
-            Some((
-                self.node.keys[i].clone(), 
-                self.node.values[i].clone()
-            ))
+            Some(LeafNodeRecord {
+                key: self.node.keys[i].clone(), 
+                val: self.node.vals[i].clone()
+            })
         } else {
             None
         }
     }
 
+}
+
+pub struct LeafNodeRecord {
+    pub key: Vec<u8>,
+    pub val: Vec<u8>
 }

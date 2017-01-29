@@ -8,6 +8,8 @@ use storage::bp_tree::leaf_node::LeafNode;
 
 pub static ERR_INVALID_NODE_TYPE: & 'static str = "Node type not recognized";
 pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "Invalid node block size";
+pub static ERR_BLOCK_SIZE_TOO_SMALL: & 'static str = "Data too small to read inner block";
+pub static ERR_INVALID_BLOCK_NUM: & 'static str = "Invalid block number";
 
 const NODE_TYPE_OFFSET: usize = 0;
 
@@ -19,24 +21,17 @@ impl Node {
 
     pub fn from_bytes(
         data: &[u8],
-        block: u32,
-        block_size: u32,
-        key_len: u32,
-        val_len: u32
+        node_ptr: u64,
+        key_len: u8,
+        val_len: u8
     ) -> Result<Node, Error> {
-
-        try!(AssertionError::assert(
-            data.len() == block_size as usize, 
-            ERR_NODE_DATA_WRONG_LENGTH
-        ));
-
         match data[0] {
             1 => {
-                let node = try!(InnerNode::from_bytes(data, block, block_size, key_len));
+                let node = try!(InnerNode::from_bytes(data, node_ptr, key_len));
                 Ok(Node::Inner(node))
             },
             2 => {
-                let node = try!(LeafNode::from_bytes(data, block, block_size, key_len, val_len));
+                let node = try!(LeafNode::from_bytes(data, node_ptr, key_len, val_len));
                 Ok(Node::Leaf(node))
             },
             _ => return Err(Error::Assertion(AssertionError::new(ERR_INVALID_NODE_TYPE)))
