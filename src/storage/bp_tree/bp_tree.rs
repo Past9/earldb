@@ -8,6 +8,8 @@ use storage::bp_tree::leaf_node::LeafNode;
 
 pub static ERR_EMPTY_INNER_NODE: & 'static str = "Empty inner node";
 pub static ERR_NODE_CORRUPTED: & 'static str = "Node data corrupted";
+pub static ERR_KEY_WRONG_LEN: & 'static str = "Key is the wrong length";
+pub static ERR_VAL_WRONG_LEN: & 'static str = "Value is the wrong length";
 
 pub struct BPTree<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> {
   storage: BPStorage<T>,
@@ -46,9 +48,28 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
     self.storage.close()
   }
 
-  pub fn search(&self, k: &[u8]) -> Result<LeafNode, Error> {
+  pub fn search(&self, k: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    // TODO: Implement binary search within leaf node
+    let node = try!(self.search_node(k));
+    for record in node {
+      if k == record.key.as_slice() { return Ok(Some(record.val)); }
+    }
+    Ok(None)
+  }
+
+  pub fn search_node(&self, k: &[u8]) -> Result<LeafNode, Error> {
+    try!(AssertionError::assert(k.len() == self.key_len as usize, ERR_KEY_WRONG_LEN));
     let root = try!(self.storage.read_node(0));
     self.tree_search(k, root)
+  }
+
+  pub fn insert(&mut self, k: &[u8], v: &[u8]) -> Result<(), Error> {
+    try!(AssertionError::assert(k.len() == self.key_len as usize, ERR_KEY_WRONG_LEN));
+    try!(AssertionError::assert(v.len() == self.val_len as usize, ERR_VAL_WRONG_LEN));
+    match self.search_node(k) {
+      Ok(mut leaf) => leaf.insert(k, v),
+      Err(e) => Err(e)
+    }
   }
 
   fn is_in_range(&self, k: &[u8], r: &InnerNodeRecord) -> Result<bool, Error> {

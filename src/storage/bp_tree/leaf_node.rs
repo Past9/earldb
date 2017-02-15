@@ -37,7 +37,8 @@ pub struct LeafNode {
   key_len: u8,
   val_len: u8,
   prev_ptr: u64,
-  next_ptr: u64
+  next_ptr: u64,
+  capacity: u64
 }
 impl LeafNode {
 
@@ -97,8 +98,44 @@ impl LeafNode {
       key_len: key_len,
       val_len: val_len,
       prev_ptr: prev_ptr,
-      next_ptr: next_ptr
+      next_ptr: next_ptr,
+      capacity: (node_size as u64 - RECORD_START_OFFSET as u64) / (key_len as u64 + val_len as u64)
     })
+  }
+
+  pub fn insert(&mut self, k: &[u8], v: &[u8]) -> Result<(), Error> {
+    match self.is_full() {
+      true => {
+        unimplemented!();
+      },
+      false => {
+        self.insert_record(k, v);
+      }
+    }
+    // TODO: Save to binary storage here
+    Ok(())
+  }
+
+  fn insert_record(&mut self, k: &[u8], v: &[u8]) {
+    for i in 0..self.len() {
+      let key = self.keys[i].clone();
+      let key_slice = key.as_slice();
+
+      if key_slice == k {
+        self.keys[i] = k.to_vec();
+        self.vals[i] = v.to_vec();
+      }
+
+      if i == self.len() { break; }
+
+      let next_key = self.keys[i + 1].clone();
+      let next_key_slice = next_key.as_slice();
+
+      if key_slice < k && k < next_key_slice {
+        self.keys.insert(i, k.to_vec()); 
+        self.vals.insert(i, v.to_vec()); 
+      }
+    }
   }
 
   pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
@@ -164,6 +201,15 @@ impl LeafNode {
 
   pub fn len(&self) -> usize {
     self.keys.len()
+  }
+
+  pub fn capacity(&self) -> u64 {
+    self.capacity
+  }
+
+  pub fn is_full(&self) -> bool {
+    let rec_len = self.key_len as u64 + self.val_len as u64;
+    self.capacity - (self.len() as u64 * rec_len) > rec_len
   }
 
 }
