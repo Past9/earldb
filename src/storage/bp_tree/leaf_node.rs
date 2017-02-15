@@ -29,6 +29,7 @@ const RECORDS_LEN_SIZE: usize = 4;
 const RECORD_START_OFFSET: usize = 29; 
 
 pub struct LeafNode {
+  storage: BPStorage,
   node_ptr: u64,
   parent_ptr: u64,
   node_size: u32,
@@ -43,6 +44,7 @@ pub struct LeafNode {
 impl LeafNode {
 
   pub fn from_bytes(
+    storage: BPStorage,
     data: &[u8],
     node_ptr: u64,
     key_len: u8,
@@ -90,6 +92,7 @@ impl LeafNode {
     }
 
     Ok(LeafNode {
+      storage: storage,
       node_ptr: node_ptr,
       parent_ptr: parent_ptr,
       node_size: node_size,
@@ -112,8 +115,7 @@ impl LeafNode {
         self.insert_record(k, v);
       }
     }
-    // TODO: Save to binary storage here
-    Ok(())
+    self.storage.save_leaf(self);
   }
 
   fn insert_record(&mut self, k: &[u8], v: &[u8]) {

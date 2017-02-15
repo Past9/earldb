@@ -10,7 +10,8 @@ pub struct BPStorage<T: BinaryStorage + Sized> {
   storage: T,
   node_size: u64,
   key_len: u8,
-  val_len: u8
+  val_len: u8,
+  num_nodes: u64
 }
 impl<T: BinaryStorage + Sized> BPStorage<T> {
 
@@ -24,7 +25,8 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
       storage: storage,
       node_size: node_size,
       key_len: key_len,
-      val_len: val_len
+      val_len: val_len,
+      num_nodes: 1
     }
   }
 
@@ -42,6 +44,11 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
       self.node_size as usize
     ));
     Node::from_bytes(data.as_slice(), node_ptr, self.key_len, self.val_len)
+  }
+
+  pub fn alloc(&self) -> Result<u64, Error> {
+    let ptr = self.num_nodes * self.node_size;
+    self.num_nodes += 1;
   }
 
   pub fn save_leaf(&mut self, node: LeafNode) -> Result<(), Error> {
