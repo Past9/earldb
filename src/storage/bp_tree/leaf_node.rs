@@ -5,17 +5,28 @@ use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 use error::{ Error, AssertionError };
 use storage::bp_tree::node;
 
+// Node type symbol is at the beginning of the node
 const NODE_TYPE_OFFSET: usize = 0;
-const NODE_TYPE_LEN: usize = 1; // u8 size
-const PARENT_PTR_OFFSET: usize = 1; // NODE_TYPE_OFFSET + NODE_TYPE_LEN
-const PARENT_PTR_LEN: usize = 8; // u64 size
-const PREV_PTR_OFFSET: usize = 9; // PARENT_PTR_OFFSET + PARENT_PTR_LEN
-const PREV_PTR_LEN: usize = 8; // u64 size
-const NEXT_PTR_OFFSET: usize = 17; // PREV_PTR_OFFSET + PREV_PTR_LEN
-const NEXT_PTR_LEN: usize = 8; // u64 size
-const RECORDS_LEN_OFFSET: usize = 25; // # all record bytes, NEXT_PTR_OFFSET + NEXT_PTR_LEN
-const RECORDS_LEN_SIZE: usize = 4; // u32 size
-const RECORD_START_OFFSET: usize = 29; // Start of records, RECORDS_LEN_OFFSET + RECORDS_LEN_SIZE
+// u8 size
+const NODE_TYPE_LEN: usize = 1; 
+// NODE_TYPE_OFFSET + NODE_TYPE_LEN
+const PARENT_PTR_OFFSET: usize = 1; 
+// u64 size
+const PARENT_PTR_LEN: usize = 8; 
+// PARENT_PTR_OFFSET + PARENT_PTR_LEN
+const PREV_PTR_OFFSET: usize = 9; 
+// u64 size
+const PREV_PTR_LEN: usize = 8; 
+// PREV_PTR_OFFSET + PREV_PTR_LEN
+const NEXT_PTR_OFFSET: usize = 17; 
+// u64 size
+const NEXT_PTR_LEN: usize = 8; 
+// # all record bytes, NEXT_PTR_OFFSET + NEXT_PTR_LEN
+const RECORDS_LEN_OFFSET: usize = 25; 
+// u32 size
+const RECORDS_LEN_SIZE: usize = 4; 
+// Start of records, RECORDS_LEN_OFFSET + RECORDS_LEN_SIZE
+const RECORD_START_OFFSET: usize = 29; 
 
 pub struct LeafNode {
   node_ptr: u64,

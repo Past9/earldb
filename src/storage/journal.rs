@@ -224,7 +224,9 @@ impl<T: BinaryStorage + Sized> Journal<T> {
   }
 
   pub fn has_end(&mut self) -> Result<bool, Error> {
-    let len = try!(self.storage.r_u32(self.read_offset + mem::size_of::<u16>() as u64));
+    let len = try!
+      (self.storage.r_u32(self.read_offset + mem::size_of::<u16>() as u64)
+    );
     Ok(
       771 == try!(self.storage.r_u16(
         self.read_offset + 

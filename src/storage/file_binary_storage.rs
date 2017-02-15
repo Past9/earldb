@@ -371,7 +371,12 @@ impl BinaryStorage for FileBinaryStorage {
     }
 
 
-    fn fill(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<(), Error> {
+    fn fill(
+      &mut self, 
+      start: Option<u64>, 
+      end: Option<u64>, 
+      val: u8
+    ) -> Result<(), Error> {
       try!(AssertionError::assert(
         self.is_open, 
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED
@@ -415,7 +420,12 @@ impl BinaryStorage for FileBinaryStorage {
       Ok(())
     }
 
-    fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error> {
+    fn is_filled(
+      &mut self, 
+      start: Option<u64>, 
+      end: Option<u64>, 
+      val: u8
+    ) -> Result<bool, Error> {
       try!(AssertionError::assert(
         self.is_open, 
         binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED
@@ -479,7 +489,9 @@ impl BinaryStorage for FileBinaryStorage {
       ));
 
       // Determine the new size of the journal in multiples of expand_size
-      let expand_increments = (min_capacity as f64 / self.expand_size as f64).ceil() as u64;
+      let expand_increments = (
+        min_capacity as f64 / self.expand_size as f64
+      ).ceil() as u64;
       let new_capacity = match expand_increments.checked_mul(self.expand_size) {
         Some(x) => x,
         None => return Err(Error::Assertion(
@@ -487,8 +499,9 @@ impl BinaryStorage for FileBinaryStorage {
         ))
       };
 
-      // We don't want to reallocate (or even reduce the capacity) if we already have enough,
-      // so just do nothing and return Ok if we already have enough room
+      // We don't want to reallocate (or even reduce the capacity) if we 
+      // already have enough, so just do nothing and return Ok if we 
+      // already have enough room.
       if new_capacity <= self.capacity { return Ok(()) }
 
       // Allocate more disk space

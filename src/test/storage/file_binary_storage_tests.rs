@@ -1171,7 +1171,9 @@ fn fill_returns_err_when_end_offset_is_before_start_offset() {
 #[test]
 fn fill_does_not_write_when_end_offset_is_before_start_offset() {
   let (s, p) = get_storage();
-  binary_storage_tests::fill_does_not_write_when_end_offset_is_before_start_offset(s);
+  binary_storage_tests::fill_does_not_write_when_end_offset_is_before_start_offset(
+    s
+  );
   rm_tmp(p);
 }
 

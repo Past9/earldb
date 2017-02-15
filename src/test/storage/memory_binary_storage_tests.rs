@@ -37,12 +37,16 @@ pub fn close_returns_ok_when_previously_open() {
 
 #[test]
 fn is_closed_when_new() {
-  binary_storage_tests::is_closed_when_new(MemoryBinaryStorage::new(256, 256).unwrap());
+  binary_storage_tests::is_closed_when_new(
+    MemoryBinaryStorage::new(256, 256).unwrap()
+  );
 }
 
 #[test]
 fn is_open_after_open() {
-  binary_storage_tests::is_open_after_open(MemoryBinaryStorage::new(256, 256).unwrap());
+  binary_storage_tests::is_open_after_open(
+    MemoryBinaryStorage::new(256, 256).unwrap()
+  );
 }
 
 #[test]
@@ -70,14 +74,20 @@ fn new_sets_expand_size() {
 fn new_requires_initial_capacity_greater_than_0() {
   let s = MemoryBinaryStorage::new(0, 512);
   assert!(s.is_err());
-  assert_eq!(binary_storage::ERR_INITIAL_CAP_TOO_SMALL, s.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_INITIAL_CAP_TOO_SMALL, 
+    s.unwrap_err().description()
+  );
 }
 
 #[test]
 fn new_requires_expand_size_greater_than_0() {
   let s = MemoryBinaryStorage::new(256, 0);
   assert!(s.is_err());
-  assert_eq!(binary_storage::ERR_EXPAND_SIZE_TOO_SMALL, s.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_EXPAND_SIZE_TOO_SMALL, 
+    s.unwrap_err().description()
+  );
 }
 
 #[test]
@@ -87,11 +97,17 @@ fn new_requires_initial_capacity_is_power_of_2() {
 
   let s2 = MemoryBinaryStorage::new(257, 512);
   assert!(s2.is_err());
-  assert_eq!(binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2, s2.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2, 
+    s2.unwrap_err().description()
+  );
 
   let s3 = MemoryBinaryStorage::new(384, 512);
   assert!(s3.is_err());
-  assert_eq!(binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2, s3.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_INITIAL_CAP_NOT_POWER_OF_2, 
+    s3.unwrap_err().description()
+  );
 
   let s4 = MemoryBinaryStorage::new(512, 512);
   assert!(s4.is_ok());
@@ -104,11 +120,17 @@ fn new_requires_expand_size_is_power_of_2() {
 
   let s2 = MemoryBinaryStorage::new(256, 513);
   assert!(s2.is_err());
-  assert_eq!(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, s2.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, 
+    s2.unwrap_err().description()
+  );
 
   let s3 = MemoryBinaryStorage::new(256, 768);
   assert!(s3.is_err());
-  assert_eq!(binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, s3.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, 
+    s3.unwrap_err().description()
+  );
 
   let s4 = MemoryBinaryStorage::new(256, 1024);
   assert!(s4.is_ok());

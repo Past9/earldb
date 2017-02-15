@@ -7,14 +7,22 @@ use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 use error::{ Error, AssertionError };
 use storage::bp_tree::node;
 
+// Node type symbol is at beginning of node
 const NODE_TYPE_OFFSET: usize = 0;
-const NODE_TYPE_LEN: usize = 1; // u8 size
-const PARENT_PTR_OFFSET: usize = 1; // NODE_TYPE_OFFSET + NODE_TYPE_LEN
-const PARENT_PTR_LEN: usize = 8; // u64 size
-const RECORDS_LEN_OFFSET: usize = 9; // # all record bytes, PARENT_PTR_OFFSET + PARENT_PTR_LEN
-const RECORDS_LEN_SIZE: usize = 4; // u32 size
-const RECORD_START_OFFSET: usize = 9; // Start of records, RECORDS_LEN_OFFSET + RECORDS_LEN_SIZE
-const PTR_LEN: usize = 8; // u64 size
+// u8 size
+const NODE_TYPE_LEN: usize = 1; 
+// NODE_TYPE_OFFSET + NODE_TYPE_LEN
+const PARENT_PTR_OFFSET: usize = 1; 
+// u64 size
+const PARENT_PTR_LEN: usize = 8; 
+// # all record bytes, PARENT_PTR_OFFSET + PARENT_PTR_LEN
+const RECORDS_LEN_OFFSET: usize = 9; 
+// u32 size
+const RECORDS_LEN_SIZE: usize = 4; 
+// Start of records, RECORDS_LEN_OFFSET + RECORDS_LEN_SIZE
+const RECORD_START_OFFSET: usize = 9; 
+// u64 size
+const PTR_LEN: usize = 8; 
 
 pub struct InnerNode {
   node_ptr: u64, // Pointer to beginning of node data
@@ -52,8 +60,14 @@ impl InnerNode {
 
     // Loop as long as we still have room to read the next key or pointer
     while match next_is_ptr {
-      true => cur_pos < RECORD_START_OFFSET as u64 + records_len as u64 - PTR_LEN as u64,
-      false => cur_pos < RECORD_START_OFFSET as u64 + records_len as u64 - key_len as u64
+      true => cur_pos < 
+        RECORD_START_OFFSET as u64 + 
+        records_len as u64 - 
+        PTR_LEN as u64,
+      false => cur_pos < 
+        RECORD_START_OFFSET as u64 + 
+        records_len as u64 - 
+        key_len as u64
     } {
       let mut rec_reader = Cursor::new(data);
       rec_reader.set_position(cur_pos);

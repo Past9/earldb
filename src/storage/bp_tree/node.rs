@@ -6,10 +6,14 @@ use error::{ Error, AssertionError };
 use storage::bp_tree::inner_node::InnerNode;
 use storage::bp_tree::leaf_node::LeafNode;
 
-pub static ERR_INVALID_NODE_TYPE: & 'static str = "Node type not recognized";
-pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = "Invalid node block size";
-pub static ERR_BLOCK_SIZE_TOO_SMALL: & 'static str = "Data too small to read inner block";
-pub static ERR_INVALID_BLOCK_NUM: & 'static str = "Invalid block number";
+pub static ERR_INVALID_NODE_TYPE: & 'static str = 
+  "Node type not recognized";
+pub static ERR_NODE_DATA_WRONG_LENGTH: & 'static str = 
+  "Invalid node block size";
+pub static ERR_BLOCK_SIZE_TOO_SMALL: & 'static str = 
+  "Data too small to read inner block";
+pub static ERR_INVALID_BLOCK_NUM: & 'static str = 
+  "Invalid block number";
 
 const NODE_TYPE_OFFSET: usize = 0;
 
@@ -74,7 +78,10 @@ impl Node {
     val_len: u32
   ) -> Result<Node, Error> {
 
-    try!(AssertionError::assert(data.len() == block_size as usize, ERR_NODE_DATA_WRONG_LENGTH));
+    try!(AssertionError::assert(
+      data.len() == block_size as usize, 
+      ERR_NODE_DATA_WRONG_LENGTH
+    ));
 
     let node_type = match data[0] {
       1 => NodeType::Inner,

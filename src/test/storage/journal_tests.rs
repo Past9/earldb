@@ -13,7 +13,9 @@ fn new_storage(
   initial_capacity: u64, 
   expand_size: u64
 ) -> TransactionalStorage<MemoryBinaryStorage> {
-  TransactionalStorage::new(MemoryBinaryStorage::new(initial_capacity, expand_size).unwrap())
+  TransactionalStorage::new(
+    MemoryBinaryStorage::new(initial_capacity, expand_size).unwrap()
+  )
 }
 
 // new() tests
@@ -61,7 +63,10 @@ pub fn open_returns_err_when_previously_open() {
 pub fn open_and_verify_counts_existing_records() {
   let mut s = new_storage(256, 256);
   s.open().unwrap();
-  s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
+  s.w_bytes(
+    0, 
+    &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]
+  ).unwrap();
   s.close().unwrap();
   let mut j = Journal::new(s);
   j.open().unwrap();
@@ -72,7 +77,10 @@ pub fn open_and_verify_counts_existing_records() {
 pub fn open_and_verify_does_not_count_uncommitted_records() {
   let mut s = new_storage(256, 256);
   s.open().unwrap();
-  s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
+  s.w_bytes(
+    0, 
+    &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]
+  ).unwrap();
   s.w_bytes(12, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0]).unwrap();
   s.close().unwrap();
   let mut j = Journal::new(s);
@@ -84,7 +92,10 @@ pub fn open_and_verify_does_not_count_uncommitted_records() {
 pub fn open_and_verify_returns_err_on_bad_checksum() {
   let mut s = new_storage(256, 256);
   s.open().unwrap();
-  s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x1, 0x3, 0x3]).unwrap();
+  s.w_bytes(
+    0, 
+    &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x1, 0x3, 0x3]
+  ).unwrap();
   s.close().unwrap();
   let mut j = Journal::new(s);
   assert_eq!(
@@ -97,7 +108,10 @@ pub fn open_and_verify_returns_err_on_bad_checksum() {
 pub fn open_and_verify_recognizes_all_committed_records() {
   let mut s = new_storage(256, 256);
   s.open().unwrap();
-  s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
+  s.w_bytes(
+    0, 
+    &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]
+  ).unwrap();
   s.close().unwrap();
   let mut j = Journal::new(s);
   j.open().unwrap();
@@ -108,7 +122,10 @@ pub fn open_and_verify_recognizes_all_committed_records() {
 pub fn open_and_verify_recognizes_uncommitted_record() {
   let mut s = new_storage(256, 256);
   s.open().unwrap();
-  s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
+  s.w_bytes(
+    0, 
+    &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]
+  ).unwrap();
   s.close().unwrap();
   let mut j = Journal::new(s);
   j.open().unwrap();
@@ -119,7 +136,10 @@ pub fn open_and_verify_recognizes_uncommitted_record() {
 pub fn open_and_verify_allows_record_commit() {
   let mut s = new_storage(256, 256);
   s.open().unwrap();
-  s.w_bytes(0, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]).unwrap();
+  s.w_bytes(
+    0, 
+    &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x0, 0x3, 0x3]
+  ).unwrap();
   s.w_bytes(12, &[0x2, 0x2, 0x3, 0x0, 0x0, 0x0]).unwrap();
   s.close().unwrap();
   let mut j = Journal::new(s);

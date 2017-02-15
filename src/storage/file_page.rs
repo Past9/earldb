@@ -18,7 +18,9 @@ impl FilePage {
   ) -> Option<FilePage> {
     if !FilePage::check_mem_params(max_size) { return None }; 
     
-    let origin = unsafe { heap::allocate(max_size as usize, mem::size_of::<usize>()) };
+    let origin = unsafe { 
+      heap::allocate(max_size as usize, mem::size_of::<usize>()) 
+    };
 
     if origin.is_null() { return None }
 
@@ -84,7 +86,9 @@ impl FilePage {
     if len >= self.actual_size { return }
     if len >= self.max_size { return }
     self.actual_size = len;
-    unsafe { ptr::write_bytes::<u8>(self.ptr_mut(len), 0x0, (self.max_size - len) as usize) };
+    unsafe { 
+      ptr::write_bytes::<u8>(self.ptr_mut(len), 0x0, (self.max_size - len) as usize) 
+    };
   }
 
   pub fn get_max_size(&self) -> u32 {

@@ -14,7 +14,12 @@ pub struct BPStorage<T: BinaryStorage + Sized> {
 }
 impl<T: BinaryStorage + Sized> BPStorage<T> {
 
-  pub fn new(mut storage: T, node_size: u64, key_len: u8, val_len: u8) -> BPStorage<T> {
+  pub fn new(
+    mut storage: T, 
+    node_size: u64, 
+    key_len: u8, 
+    val_len: u8
+  ) -> BPStorage<T> {
     BPStorage {
       storage: storage,
       node_size: node_size,

@@ -70,8 +70,19 @@ pub trait BinaryStorage {
   fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error>;
   fn r_str(&mut self, offset: u64, len: usize) -> Result<String, Error>;
 
-  fn fill(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<(), Error>;
-  fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error>;
+  fn fill(
+    &mut self, 
+    start: Option<u64>, 
+    end: Option<u64>, 
+    val: u8
+  ) -> Result<(), Error>;
+
+  fn is_filled(
+    &mut self, 
+    start: Option<u64>, 
+    end: Option<u64>, 
+    val: u8
+  ) -> Result<bool, Error>;
 
   fn get_expand_size(&self) -> u64;
   fn set_expand_size(&mut self, expand_size: u64) -> Result<(), Error>;

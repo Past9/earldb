@@ -90,7 +90,10 @@ fn read_reads_data_across_multiple_page_boundaries() {
   let mut b = FileSyncedBuffer::new(file_r("100.txt"), 16, 16);
   let res = b.read(40, 35).unwrap();
   assert_eq!(35, res.len());
-  assert_eq!("adipiscing elit. Integer ut imperdi", str::from_utf8(res.as_slice()).unwrap());
+  assert_eq!(
+    "adipiscing elit. Integer ut imperdi", 
+    str::from_utf8(res.as_slice()).unwrap()
+  );
 }
 
 // update() tests
@@ -176,7 +179,9 @@ fn update_writes_across_page_boundaries_from_nth_page() {
 fn update_writes_across_multiple_page_boundaries_from_first_page() {
   let (mut f, p) = file_tmp_rw();
 
-  f.write(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]).unwrap();
+  f.write(
+    &[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]
+  ).unwrap();
   let mut b = FileSyncedBuffer::new(f, 4, 16);
   assert_eq!(vec!(0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8), b.read(6, 8).unwrap());
   b.update(6, &[0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1]); 
@@ -189,7 +194,9 @@ fn update_writes_across_multiple_page_boundaries_from_first_page() {
 fn update_writes_across_multiple_page_boundaries_from_nth_page() {
   let (mut f, p) = file_tmp_rw();
 
-  f.write(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]).unwrap();
+  f.write(
+    &[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]
+  ).unwrap();
   let mut b = FileSyncedBuffer::new(f, 4, 16);
   assert_eq!(vec!(0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8), b.read(6, 8).unwrap());
   b.update(6, &[0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1]); 
@@ -202,7 +209,9 @@ fn update_writes_across_multiple_page_boundaries_from_nth_page() {
 fn update_only_writes_to_cached_pages() {
   let (mut f, p) = file_tmp_rw();
 
-  f.write(&[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]).unwrap();
+  f.write(
+    &[0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8]
+  ).unwrap();
   let mut b = FileSyncedBuffer::new(f, 4, 16);
   assert_eq!(vec!(0x0, 0x0, 0x1, 0x2), b.read(4, 4).unwrap());
   assert_eq!(vec!(0x7, 0x8), b.read(12, 4).unwrap());
@@ -381,7 +390,10 @@ fn reads_multiple_pages_when_caching_0_pages() {
   assert_eq!(0, b.get_num_current_pages());
   let res = b.read(4, 32).unwrap();
   assert_eq!(32, res.len());
-  assert_eq!("m ipsum dolor sit amet, consecte", str::from_utf8(res.as_slice()).unwrap());
+  assert_eq!(
+    "m ipsum dolor sit amet, consecte", 
+    str::from_utf8(res.as_slice()).unwrap()
+  );
   assert_eq!(0, b.get_num_current_pages());
 }
 
@@ -401,7 +413,10 @@ fn reads_multiple_pages_when_caching_1_page() {
   assert_eq!(0, b.get_num_current_pages());
   let res = b.read(4, 32).unwrap();
   assert_eq!(32, res.len());
-  assert_eq!("m ipsum dolor sit amet, consecte", str::from_utf8(res.as_slice()).unwrap());
+  assert_eq!(
+    "m ipsum dolor sit amet, consecte", 
+    str::from_utf8(res.as_slice()).unwrap()
+  );
   assert_eq!(1, b.get_num_current_pages());
 }
 
@@ -421,7 +436,10 @@ fn reads_multiple_pages_when_caching_multiple_pages() {
   assert_eq!(0, b.get_num_current_pages());
   let res = b.read(4, 32).unwrap();
   assert_eq!(32, res.len());
-  assert_eq!("m ipsum dolor sit amet, consecte", str::from_utf8(res.as_slice()).unwrap());
+  assert_eq!(
+    "m ipsum dolor sit amet, consecte", 
+    str::from_utf8(res.as_slice()).unwrap()
+  );
   assert_eq!(3, b.get_num_current_pages());
 }
 
@@ -432,8 +450,8 @@ fn only_caches_up_to_max_pages() {
   let res = b.read(4, 64).unwrap();
   assert_eq!(64, res.len());
   assert_eq!(
-      "m ipsum dolor sit amet, consectetur adipiscing elit. Integer ut ", 
-      str::from_utf8(res.as_slice()).unwrap()
+    "m ipsum dolor sit amet, consectetur adipiscing elit. Integer ut ", 
+    str::from_utf8(res.as_slice()).unwrap()
   );
   assert_eq!(3, b.get_num_current_pages());
 }

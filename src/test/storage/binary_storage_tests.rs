@@ -51,7 +51,10 @@ pub fn is_closed_after_open_and_close<T: BinaryStorage>(mut s: T) {
 pub fn w_i8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_i8(0, i8::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_i8_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -78,7 +81,10 @@ pub fn w_i8_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_i16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_i16(0, i16::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_i16_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -105,7 +111,10 @@ pub fn w_i16_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_i32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_i32(0, i32::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_i32_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -132,7 +141,10 @@ pub fn w_i32_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_i64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_i64(0, i64::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_i64_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -159,7 +171,10 @@ pub fn w_i64_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_u8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_u8(0, u8::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_u8_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -186,7 +201,10 @@ pub fn w_u8_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_u16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_u16(0, u16::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_u16_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -213,7 +231,10 @@ pub fn w_u16_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_u32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_u32(0, u32::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_u32_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -240,7 +261,10 @@ pub fn w_u32_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_u64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_u64(0, u64::max_value());
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_u64_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -267,7 +291,10 @@ pub fn w_u64_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_f32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_f32(0, 12345.6789);
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_f32_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -294,7 +321,10 @@ pub fn w_f32_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
 pub fn w_f64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_open());
   let res = s.w_f64(0, 12345.6789);
-  assert_eq!(binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, res.unwrap_err().description());
+  assert_eq!(
+    binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED, 
+    res.unwrap_err().description()
+  );
 }
 
 pub fn w_f64_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
@@ -375,7 +405,9 @@ pub fn w_bytes_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
   assert_eq!(vec!(0x0, 0x1), s.r_bytes(255, 2).unwrap());
 }
 
-pub fn w_bytes_over_capacity_expands_storage_multiple_times<T: BinaryStorage>(mut s: T) {
+pub fn w_bytes_over_capacity_expands_storage_multiple_times<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   assert_eq!(256, s.get_capacity().unwrap());
   assert!(s.w_bytes(255, &[0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6]).is_ok());
@@ -415,7 +447,9 @@ pub fn w_str_over_capacity_expands_storage<T: BinaryStorage>(mut s: T) {
   assert_eq!("I \u{2661} Rust", s.r_str(255, 10).unwrap());
 }
 
-pub fn w_str_over_capacity_expands_storage_multiple_times<T: BinaryStorage>(mut s: T) {
+pub fn w_str_over_capacity_expands_storage_multiple_times<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   assert_eq!(256, s.get_capacity().unwrap());
   assert!(s.w_str(255, "I \u{2661} Rust").is_ok());
@@ -977,7 +1011,9 @@ pub fn r_bytes_does_not_read_past_capacity<T: BinaryStorage>(mut s: T) {
   );
 }
 
-pub fn r_bytes_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: T) {
+pub fn r_bytes_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.w_bytes(0, &[0x0, 0x1, 0x2]).unwrap();
   let res1 = s.r_bytes(0, 3).unwrap();
@@ -1004,7 +1040,10 @@ pub fn r_str_returns_ok_when_open<T: BinaryStorage>(mut s: T) {
 
 pub fn r_str_reads_nulls_from_unwritten_storage<T: BinaryStorage>(mut s: T) {
   s.open().unwrap();
-  assert_eq!(str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), s.r_str(0, 5).unwrap());
+  assert_eq!(
+    str::from_utf8(&[0x0, 0x0, 0x0, 0x0, 0x0]).unwrap(), 
+    s.r_str(0, 5).unwrap()
+  );
 }
 
 pub fn r_str_reads_written_data<T: BinaryStorage>(mut s: T) {
@@ -1064,7 +1103,9 @@ pub fn fill_repeats_byte_in_storage_range<T: BinaryStorage>(mut s: T) {
   assert!(s.is_filled(Some(20), None, 0x0).unwrap());
 }
 
-pub fn fill_starts_from_beginning_when_start_offset_is_none<T: BinaryStorage>(mut s: T) {
+pub fn fill_starts_from_beginning_when_start_offset_is_none<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   assert_eq!(true, s.fill(None, Some(20), 0x1).is_ok());
   assert!(s.is_filled(Some(0), Some(20), 0x1).unwrap());
@@ -1078,7 +1119,9 @@ pub fn fill_goes_to_end_when_end_offset_is_none<T: BinaryStorage>(mut s: T) {
   assert!(s.is_filled(Some(10), None, 0x1).unwrap());
 }
 
-pub fn fill_returns_err_when_end_offset_is_before_start_offset<T: BinaryStorage>(mut s: T) {
+pub fn fill_returns_err_when_end_offset_is_before_start_offset<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   assert_eq!(
     binary_storage::ERR_WRITE_NOTHING,
@@ -1086,7 +1129,9 @@ pub fn fill_returns_err_when_end_offset_is_before_start_offset<T: BinaryStorage>
   );
 }
 
-pub fn fill_does_not_write_when_end_offset_is_before_start_offset<T: BinaryStorage>(mut s: T) {
+pub fn fill_does_not_write_when_end_offset_is_before_start_offset<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.fill(Some(20), Some(10), 0x1).unwrap_err();
   assert!(s.is_filled(None, None, 0x0).unwrap());
@@ -1124,7 +1169,9 @@ pub fn is_filled_retuns_err_when_closed<T: BinaryStorage>(mut s: T) {
   );
 }
 
-pub fn is_filled_returns_err_when_start_offset_past_capacity<T: BinaryStorage>(mut s: T) {
+pub fn is_filled_returns_err_when_start_offset_past_capacity<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   assert!(s.is_filled(Some(255), None, 0x0).unwrap());
   assert_eq!(
@@ -1133,9 +1180,8 @@ pub fn is_filled_returns_err_when_start_offset_past_capacity<T: BinaryStorage>(m
   );
 }
 
-pub fn is_filled_returns_err_when_end_offset_at_or_before_start_offset<T: BinaryStorage>(
-  mut s: T
-) {
+pub fn is_filled_returns_err_when_end_offset_at_or_before_start_offset
+ <T: BinaryStorage>(mut s: T) {
   s.open().unwrap();
   assert!(s.is_filled(Some(10), Some(11), 0x0).unwrap());
   assert_eq!(
@@ -1148,7 +1194,9 @@ pub fn is_filled_returns_err_when_end_offset_at_or_before_start_offset<T: Binary
   );
 }
 
-pub fn is_filled_returns_err_when_end_offset_past_capacity<T: BinaryStorage>(mut s: T) {
+pub fn is_filled_returns_err_when_end_offset_past_capacity<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   assert!(s.is_filled(Some(10), Some(256), 0x0).unwrap());
   assert_eq!(
@@ -1157,7 +1205,9 @@ pub fn is_filled_returns_err_when_end_offset_past_capacity<T: BinaryStorage>(mut
   );
 }
 
-pub fn is_filled_checks_whether_all_bytes_in_range_match_value<T: BinaryStorage>(mut s: T) {
+pub fn is_filled_checks_whether_all_bytes_in_range_match_value<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.fill(Some(10), Some(20), 0x1).unwrap();
   assert!(s.is_filled(None, Some(10), 0x0).unwrap());
@@ -1176,7 +1226,9 @@ pub fn is_filled_starts_from_start_offset<T: BinaryStorage>(mut s: T) {
   assert!(!s.is_filled(Some(9), None, 0x0).unwrap());
 }
 
-pub fn is_filled_starts_from_beginning_when_start_offset_is_none<T: BinaryStorage>(mut s: T) {
+pub fn is_filled_starts_from_beginning_when_start_offset_is_none<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.fill(Some(1), None, 0x1).unwrap();
   assert!(s.is_filled(None, Some(1), 0x0).unwrap());
@@ -1202,26 +1254,31 @@ pub fn get_expand_size_returns_initial_expand_size<T: BinaryStorage>(s: T) {
   assert_eq!(512, s.get_expand_size());
 }
 
-pub fn set_expand_size_returns_err_when_expand_size_is_zero<T: BinaryStorage>(mut s: T) {
+pub fn set_expand_size_returns_err_when_expand_size_is_zero<T: BinaryStorage>(
+  mut s: T
+) {
   assert_eq!(
     binary_storage::ERR_EXPAND_SIZE_TOO_SMALL, 
     s.set_expand_size(0).unwrap_err().description()
   );
 }
 
-pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_zero<T: BinaryStorage>(mut s: T) {
+pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_zero
+ <T: BinaryStorage>(mut s: T) {
   s.set_expand_size(0).unwrap_err();
   assert_eq!(512, s.get_expand_size());
 }
 
-pub fn set_expand_size_returns_err_when_expand_size_is_not_power_of_2<T: BinaryStorage>(mut s: T) {
+pub fn set_expand_size_returns_err_when_expand_size_is_not_power_of_2
+ <T: BinaryStorage>(mut s: T) {
   assert_eq!(
     binary_storage::ERR_EXPAND_SIZE_NOT_POWER_OF_2, 
     s.set_expand_size(513).unwrap_err().description()
   );
 }
 
-pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_not_power_of_2<T: BinaryStorage>(
+pub fn set_expand_size_does_not_change_expand_size_when_expand_size_is_not_power_of_2
+ <T: BinaryStorage>(
   mut s: T
 ) {
   s.set_expand_size(513).unwrap_err();
@@ -1232,12 +1289,16 @@ pub fn set_expand_size_returns_true_when_checks_pass<T: BinaryStorage>(mut s: T)
   assert!(s.set_expand_size(1024).is_ok());
 }
 
-pub fn set_expand_size_changes_expand_size_when_checks_pass<T: BinaryStorage>(mut s: T) {
+pub fn set_expand_size_changes_expand_size_when_checks_pass<T: BinaryStorage>(
+  mut s: T
+) {
   s.set_expand_size(1024).unwrap();
   assert_eq!(1024, s.get_expand_size());
 }
 
-pub fn capacity_increases_to_increments_of_last_set_expand_size<T: BinaryStorage>(mut s: T) {
+pub fn capacity_increases_to_increments_of_last_set_expand_size<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.w_u8(256, 0x1).unwrap();
   /*
@@ -1268,7 +1329,9 @@ pub fn get_capacity_returns_initial_capacity_when_open<T: BinaryStorage>(mut s: 
   assert_eq!(256, s.get_capacity().unwrap());
 }
 
-pub fn get_capacity_returns_new_capacity_after_expansion<T: BinaryStorage>(mut s: T) {
+pub fn get_capacity_returns_new_capacity_after_expansion<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.w_u8(256, 0x1).unwrap();
   assert_eq!(512, s.get_capacity().unwrap());
@@ -1295,14 +1358,18 @@ pub fn expand_returns_ok_when_already_has_capacity<T: BinaryStorage>(mut s: T) {
   assert!(s.expand(50).is_ok());
 }
 
-pub fn expand_does_not_change_capacity_when_already_has_capacity<T: BinaryStorage>(mut s: T) {
+pub fn expand_does_not_change_capacity_when_already_has_capacity<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.set_expand_size(16).unwrap();
   s.expand(50).unwrap();
   assert_eq!(256, s.get_capacity().unwrap());
 }
 
-pub fn expand_returns_err_when_allocation_arithmetic_overflows<T: BinaryStorage>(mut s: T) {
+pub fn expand_returns_err_when_allocation_arithmetic_overflows<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   assert_eq!(
     binary_storage::ERR_ARITHMETIC_OVERFLOW,
@@ -1310,7 +1377,8 @@ pub fn expand_returns_err_when_allocation_arithmetic_overflows<T: BinaryStorage>
   );
 }
 
-pub fn expand_does_not_change_capacity_when_allocation_arithmetic_overflows<T: BinaryStorage>(mut s: T) {
+pub fn expand_does_not_change_capacity_when_allocation_arithmetic_overflows
+ <T: BinaryStorage>(mut s: T) {
   s.open().unwrap();
   s.expand(u64::max_value()).unwrap_err();
   assert_eq!(256, s.get_capacity().unwrap());
@@ -1324,7 +1392,9 @@ pub fn expand_returns_err_when_allocation_fails<T: BinaryStorage>(mut s: T) {
   );
 }
 
-pub fn expand_does_not_change_capacity_when_allocation_fails<T: BinaryStorage>(mut s: T) {
+pub fn expand_does_not_change_capacity_when_allocation_fails<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.expand(u64::max_value() - 1024).unwrap_err();
   assert_eq!(256, s.get_capacity().unwrap());
@@ -1335,13 +1405,16 @@ pub fn expand_returns_ok_when_successful<T: BinaryStorage>(mut s: T) {
   assert!(s.expand(300).is_ok());
 }
 
-pub fn expand_changes_capacity_by_expand_size_when_successful<T: BinaryStorage>(mut s: T) {
+pub fn expand_changes_capacity_by_expand_size_when_successful<T: BinaryStorage>(
+  mut s: T
+) {
   s.open().unwrap();
   s.expand(300).unwrap();
   assert_eq!(512, s.get_capacity().unwrap());
 }
 
-pub fn expand_changes_capacity_by_multiples_of_expand_size_when_successful<T: BinaryStorage>(mut s: T) {
+pub fn expand_changes_capacity_by_multiples_of_expand_size_when_successful
+ <T: BinaryStorage>(mut s: T) {
   s.open().unwrap();
   s.expand(3000).unwrap();
   assert_eq!(3072, s.get_capacity().unwrap());

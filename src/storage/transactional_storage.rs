@@ -238,7 +238,12 @@ impl<T: BinaryStorage + Sized> BinaryStorage for TransactionalStorage<T> {
   }
 
 
-  fn fill(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<(), Error> {
+  fn fill(
+    &mut self, 
+    start: Option<u64>, 
+    end: Option<u64>, 
+    val: u8
+  ) -> Result<(), Error> {
     match start {
       None => try!(self.check_boundary_for_write(0)),
       Some(s) => try!(self.check_boundary_for_write(s))
@@ -252,7 +257,12 @@ impl<T: BinaryStorage + Sized> BinaryStorage for TransactionalStorage<T> {
     self.storage.fill(start, end, val)
   }
 
-  fn is_filled(&mut self, start: Option<u64>, end: Option<u64>, val: u8) -> Result<bool, Error> {
+  fn is_filled(
+    &mut self, 
+    start: Option<u64>, 
+    end: Option<u64>, 
+    val: u8
+  ) -> Result<bool, Error> {
     self.storage.is_filled(start, end, val)
   }
 

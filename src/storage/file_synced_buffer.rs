@@ -42,7 +42,12 @@ impl FileSyncedBuffer {
     (start as u64, end as u64)
   }
 
-  fn calc_page_section(&self, page_index: u64, offset: u64, length: usize) -> (u32, u32) {
+  fn calc_page_section(
+    &self, 
+    page_index: u64, 
+    offset: u64, 
+    length: usize
+  ) -> (u32, u32) {
     let page_size = self.page_size as u64;
     let len = length as u64;
 
@@ -100,7 +105,12 @@ impl FileSyncedBuffer {
     self.page_insertions.push_back(index);
   }
 
-  fn read_from_page(&mut self, index: u64, start: u32, len: u32) -> Result<Vec<u8>, Error> {
+  fn read_from_page(
+    &mut self, 
+    index: u64, 
+    start: u32, 
+    len: u32
+  ) -> Result<Vec<u8>, Error> {
 
     match self.pages.get(&index) {
       Some(p) => return Ok(p.read(start, len)),
@@ -154,7 +164,11 @@ impl FileSyncedBuffer {
     let mut data_offset: u64 = 0;
 
     for i in start..(end + 1) {
-      let (start_in_page, len_in_page) = self.calc_page_section(i, offset, data.len());
+      let (start_in_page, len_in_page) = self.calc_page_section(
+        i, 
+        offset, 
+        data.len()
+      );
       if i == start { data_offset = (start * page_size) + start_in_page as u64 }
       let mut page = match self.pages.get_mut(&i) {
         Some(p) => p,
