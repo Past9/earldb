@@ -1,6 +1,7 @@
 extern crate alloc;
 extern crate core;
 
+use std::cell::RefCell;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::iter::FromIterator;
@@ -11,11 +12,11 @@ use storage::file_page::FilePage;
 
 
 pub struct FileSyncedBuffer {
-  file: File,
+  file: RefCell<File>,
   page_size: u32,
   max_pages: u32,
-  pages: HashMap<u64, FilePage>,
-  page_insertions: VecDeque<u64>
+  pages: RefCell<HashMap<u64, FilePage>>,
+  page_insertions: RefCell<VecDeque<u64>>
 }
 impl FileSyncedBuffer {
 
@@ -25,11 +26,11 @@ impl FileSyncedBuffer {
     max_pages: u32,
   ) -> FileSyncedBuffer {
     FileSyncedBuffer {
-      file: file,
+      file: RefCell::new(file),
       page_size: page_size,
       max_pages: max_pages,
-      pages: HashMap::new(),
-      page_insertions: VecDeque::new()
+      pages: RefCell::new(HashMap::new()),
+      page_insertions: RefCell::new(VecDeque::new())
     }
   }
 
@@ -72,58 +73,63 @@ impl FileSyncedBuffer {
     (start_offset_in_page as u32, (end_offset_in_page - start_offset_in_page) as u32)
   }
 
-  fn remove_oldest_page(&mut self) {
-    if self.page_insertions.len() == 0 { return }
-    match self.page_insertions.pop_front() {
+  fn remove_oldest_page(&self) {
+    if self.page_insertions.borrow().len() == 0 { return }
+    match self.page_insertions.borrow_mut().pop_front() {
       Some(i) => { 
-        self.pages.remove(&i); 
+        self.pages.borrow_mut().remove(&i); 
+        return;
       },
-      None => self.remove_oldest_page()
-    }
+      _ => ()
+    };
+    self.remove_oldest_page();
   }
 
-  fn remove_oldest_pages(&mut self, room_for: u32) {
+  fn remove_oldest_pages(&self, room_for: u32) {
     let rf = room_for as usize;
     let max_pages = self.max_pages as usize;
-    if self.pages.len() + rf <= max_pages { return }
-    let num_to_rm = self.pages.len() - max_pages + rf;
+    if self.pages.borrow().len() + rf <= max_pages { return }
+    let num_to_rm = self.pages.borrow().len() - max_pages + rf;
     for _ in 0..(num_to_rm) { self.remove_oldest_page() }
   }
 
   fn remove_page(&mut self, index: u64) {
-    self.pages.remove(&index);
-    match self.page_insertions.iter().position(|&x| x == index) {
-      Some(i) => self.page_insertions.remove(i),
+    self.pages.borrow_mut().remove(&index);
+
+    let mut ins = self.page_insertions.borrow_mut();
+
+    match ins.iter().position(|&x| x == index) {
+      Some(i) => ins.remove(i),
       None => return
     };
   }
 
-  fn insert_page(&mut self, index: u64, page: FilePage) {
+  fn insert_page(&self, index: u64, page: FilePage) {
     if self.max_pages == 0 { return }
     self.remove_oldest_pages(1);
-    self.pages.insert(index, page); 
-    self.page_insertions.push_back(index);
+    self.pages.borrow_mut().insert(index, page); 
+    self.page_insertions.borrow_mut().push_back(index);
   }
 
   fn read_from_page(
-    &mut self, 
+    &self, 
     index: u64, 
     start: u32, 
     len: u32
   ) -> Result<Vec<u8>, Error> {
 
-    match self.pages.get(&index) {
+    match self.pages.borrow().get(&index) {
       Some(p) => return Ok(p.read(start, len)),
       None => ()
     };
 
     let seek_pos = index * self.page_size as u64;
 
-    try!(self.file.seek(SeekFrom::Start(seek_pos)));
+    try!(self.file.borrow_mut().seek(SeekFrom::Start(seek_pos)));
 
     let mut buf = vec![0; self.page_size as usize];
     
-    let read_len = try!(self.file.read(buf.as_mut_slice()));
+    let read_len = try!(self.file.borrow_mut().read(buf.as_mut_slice()));
     buf.truncate(read_len);
 
     let mut page = FilePage::new(self.page_size).unwrap();
@@ -135,7 +141,7 @@ impl FileSyncedBuffer {
     Ok(data)
   }
 
-  pub fn read(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
+  pub fn read(&self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
     let (start, end) = self.calc_page_range(offset, len);
 
     let mut data = Vec::new();
@@ -170,24 +176,24 @@ impl FileSyncedBuffer {
         data.len()
       );
       if i == start { data_offset = (start * page_size) + start_in_page as u64 }
-      let mut page = match self.pages.get_mut(&i) {
-        Some(p) => p,
+      match self.pages.borrow_mut().get_mut(&i) {
+        Some(p) => {
+          let start_in_data = i * page_size + start_in_page as u64 - data_offset;
+          let end_in_data = start_in_data + (len_in_page as u64);
+          p.write(
+            start_in_page,
+            &data[(start_in_data as usize)..(end_in_data as usize)]
+          );
+        },
         None => continue 
       };
-
-      let start_in_data = i * page_size + start_in_page as u64 - data_offset;
-      let end_in_data = start_in_data + (len_in_page as u64);
-      page.write(
-        start_in_page,
-        &data[(start_in_data as usize)..(end_in_data as usize)]
-      );
     }
   }
 
   pub fn truncate(&mut self, len: u64) {
     if len == 0 { 
-      self.pages.clear();
-      self.page_insertions.clear();
+      self.pages.borrow_mut().clear();
+      self.page_insertions.borrow_mut().clear();
       return;
     }
 
@@ -196,7 +202,7 @@ impl FileSyncedBuffer {
     let last_page = len / page_size;         
     let last_page_len = (len % page_size) as u32;
     let to_remove = Vec::from_iter(
-      self.page_insertions.iter()
+      self.page_insertions.borrow().iter()
         .filter(|&&p| p > last_page)
         .map(|&p| p.clone())
     );
@@ -206,7 +212,7 @@ impl FileSyncedBuffer {
       self.remove_page(p);
     }
 
-    match self.pages.get_mut(&last_page) {
+    match self.pages.borrow_mut().get_mut(&last_page) {
       Some(p) => {
         p.truncate(last_page_len);
       },
@@ -229,11 +235,11 @@ impl FileSyncedBuffer {
   }
 
   pub fn get_num_current_pages(&self) -> u32 {
-    self.pages.len() as u32
+    self.pages.borrow().len() as u32
   }
 
   pub fn get_current_page_insertions(&self) -> Vec<u64> {
-    Vec::from_iter(self.page_insertions.iter().map(|&x| x))
+    Vec::from_iter(self.page_insertions.borrow().iter().map(|&x| x))
   }
 
 }

@@ -52,23 +52,23 @@ pub trait BinaryStorage {
   fn w_str(&mut self, offset: u64, data: &str) -> Result<(), Error>;
 
 
-  fn r_i8(&mut self, offset: u64) -> Result<i8, Error>;
-  fn r_i16(&mut self, offset: u64) -> Result<i16, Error>;
-  fn r_i32(&mut self, offset: u64) -> Result<i32, Error>;
-  fn r_i64(&mut self, offset: u64) -> Result<i64, Error>;
+  fn r_i8(&self, offset: u64) -> Result<i8, Error>;
+  fn r_i16(&self, offset: u64) -> Result<i16, Error>;
+  fn r_i32(&self, offset: u64) -> Result<i32, Error>;
+  fn r_i64(&self, offset: u64) -> Result<i64, Error>;
 
-  fn r_u8(&mut self, offset: u64) -> Result<u8, Error>;
-  fn r_u16(&mut self, offset: u64) -> Result<u16, Error>;
-  fn r_u32(&mut self, offset: u64) -> Result<u32, Error>;
-  fn r_u64(&mut self, offset: u64) -> Result<u64, Error>;
+  fn r_u8(&self, offset: u64) -> Result<u8, Error>;
+  fn r_u16(&self, offset: u64) -> Result<u16, Error>;
+  fn r_u32(&self, offset: u64) -> Result<u32, Error>;
+  fn r_u64(&self, offset: u64) -> Result<u64, Error>;
 
-  fn r_f32(&mut self, offset: u64) -> Result<f32, Error>;
-  fn r_f64(&mut self, offset: u64) -> Result<f64, Error>;
+  fn r_f32(&self, offset: u64) -> Result<f32, Error>;
+  fn r_f64(&self, offset: u64) -> Result<f64, Error>;
 
-  fn r_bool(&mut self, offset: u64) -> Result<bool, Error>;
+  fn r_bool(&self, offset: u64) -> Result<bool, Error>;
 
-  fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error>;
-  fn r_str(&mut self, offset: u64, len: usize) -> Result<String, Error>;
+  fn r_bytes(&self, offset: u64, len: usize) -> Result<Vec<u8>, Error>;
+  fn r_str(&self, offset: u64, len: usize) -> Result<String, Error>;
 
   fn fill(
     &mut self, 
@@ -78,7 +78,7 @@ pub trait BinaryStorage {
   ) -> Result<(), Error>;
 
   fn is_filled(
-    &mut self, 
+    &self, 
     start: Option<u64>, 
     end: Option<u64>, 
     val: u8

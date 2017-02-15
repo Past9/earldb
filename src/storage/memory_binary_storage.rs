@@ -231,22 +231,22 @@ impl BinaryStorage for MemoryBinaryStorage {
   }
 
 
-  fn r_i8(&mut self, offset: u64) -> Result<i8, Error> { self.read(offset) }
-  fn r_i16(&mut self, offset: u64) -> Result<i16, Error> { self.read(offset) }
-  fn r_i32(&mut self, offset: u64) -> Result<i32, Error> { self.read(offset) }
-  fn r_i64(&mut self, offset: u64) -> Result<i64, Error> { self.read(offset) }
+  fn r_i8(&self, offset: u64) -> Result<i8, Error> { self.read(offset) }
+  fn r_i16(&self, offset: u64) -> Result<i16, Error> { self.read(offset) }
+  fn r_i32(&self, offset: u64) -> Result<i32, Error> { self.read(offset) }
+  fn r_i64(&self, offset: u64) -> Result<i64, Error> { self.read(offset) }
 
-  fn r_u8(&mut self, offset: u64) -> Result<u8, Error> { self.read(offset) }
-  fn r_u16(&mut self, offset: u64) -> Result<u16, Error> { self.read(offset) }
-  fn r_u32(&mut self, offset: u64) -> Result<u32, Error> { self.read(offset) }
-  fn r_u64(&mut self, offset: u64) -> Result<u64, Error> { self.read(offset) }
+  fn r_u8(&self, offset: u64) -> Result<u8, Error> { self.read(offset) }
+  fn r_u16(&self, offset: u64) -> Result<u16, Error> { self.read(offset) }
+  fn r_u32(&self, offset: u64) -> Result<u32, Error> { self.read(offset) }
+  fn r_u64(&self, offset: u64) -> Result<u64, Error> { self.read(offset) }
 
-  fn r_f32(&mut self, offset: u64) -> Result<f32, Error> { self.read(offset) }
-  fn r_f64(&mut self, offset: u64) -> Result<f64, Error> { self.read(offset) }
+  fn r_f32(&self, offset: u64) -> Result<f32, Error> { self.read(offset) }
+  fn r_f64(&self, offset: u64) -> Result<f64, Error> { self.read(offset) }
 
-  fn r_bool(&mut self, offset: u64) -> Result<bool, Error> { self.read(offset) }
+  fn r_bool(&self, offset: u64) -> Result<bool, Error> { self.read(offset) }
 
-  fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
+  fn r_bytes(&self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
     try!(AssertionError::assert(
       self.is_open, 
       binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED
@@ -268,7 +268,7 @@ impl BinaryStorage for MemoryBinaryStorage {
     Ok(dst)
   }
 
-  fn r_str(&mut self, offset: u64, len: usize) -> Result<String, Error> {
+  fn r_str(&self, offset: u64, len: usize) -> Result<String, Error> {
     let b = try!(self.r_bytes(offset, len));
     Ok(try!(str::from_utf8(b.as_slice())).to_string())
   }
@@ -320,7 +320,7 @@ impl BinaryStorage for MemoryBinaryStorage {
   }
 
   fn is_filled(
-    &mut self, 
+    &self, 
     start: Option<u64>, 
     end: Option<u64>, 
     val: u8

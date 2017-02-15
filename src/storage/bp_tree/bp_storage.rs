@@ -36,7 +36,7 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
     self.storage.close()
   }
 
-  pub fn read_node(&mut self, node_ptr: u64) -> Result<Node, Error> {
+  pub fn read_node(&self, node_ptr: u64) -> Result<Node, Error> {
     let data = try!(self.storage.r_bytes(
       node_ptr, 
       self.node_size as usize

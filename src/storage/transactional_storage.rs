@@ -168,71 +168,71 @@ impl<T: BinaryStorage + Sized> BinaryStorage for TransactionalStorage<T> {
 
 
 
-  fn r_i8(&mut self, offset: u64) -> Result<i8, Error> {
+  fn r_i8(&self, offset: u64) -> Result<i8, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<i8>()));
     self.storage.r_i8(offset)
   }
 
-  fn r_i16(&mut self, offset: u64) -> Result<i16, Error> {
+  fn r_i16(&self, offset: u64) -> Result<i16, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<i16>()));
     self.storage.r_i16(offset)
   }
 
-  fn r_i32(&mut self, offset: u64) -> Result<i32, Error> {
+  fn r_i32(&self, offset: u64) -> Result<i32, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<i32>()));
     self.storage.r_i32(offset)
   }
 
-  fn r_i64(&mut self, offset: u64) -> Result<i64, Error> {
+  fn r_i64(&self, offset: u64) -> Result<i64, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<i64>()));
     self.storage.r_i64(offset)
   }
 
 
-  fn r_u8(&mut self, offset: u64) -> Result<u8, Error> {
+  fn r_u8(&self, offset: u64) -> Result<u8, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<u8>()));
     self.storage.r_u8(offset)
   }
 
-  fn r_u16(&mut self, offset: u64) -> Result<u16, Error> {
+  fn r_u16(&self, offset: u64) -> Result<u16, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<u16>()));
     self.storage.r_u16(offset)
   }
 
-  fn r_u32(&mut self, offset: u64) -> Result<u32, Error> {
+  fn r_u32(&self, offset: u64) -> Result<u32, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<u32>()));
     self.storage.r_u32(offset)
   }
 
-  fn r_u64(&mut self, offset: u64) -> Result<u64, Error> {
+  fn r_u64(&self, offset: u64) -> Result<u64, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<u64>()));
     self.storage.r_u64(offset)
   }
 
 
-  fn r_f32(&mut self, offset: u64) -> Result<f32, Error> {
+  fn r_f32(&self, offset: u64) -> Result<f32, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<f32>()));
     self.storage.r_f32(offset)
   }
 
-  fn r_f64(&mut self, offset: u64) -> Result<f64, Error> {
+  fn r_f64(&self, offset: u64) -> Result<f64, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<f64>()));
     self.storage.r_f64(offset)
   }
 
 
-  fn r_bool(&mut self, offset: u64) -> Result<bool, Error> {
+  fn r_bool(&self, offset: u64) -> Result<bool, Error> {
     try!(self.check_boundary_for_read(offset, size_of::<bool>()));
     self.storage.r_bool(offset)
   }
 
 
-  fn r_bytes(&mut self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
+  fn r_bytes(&self, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
     try!(self.check_boundary_for_read(offset, len));
     self.storage.r_bytes(offset, len)
   }
 
-  fn r_str(&mut self, offset: u64, len: usize) -> Result<String, Error> {
+  fn r_str(&self, offset: u64, len: usize) -> Result<String, Error> {
     try!(self.check_boundary_for_read(offset, len));
     self.storage.r_str(offset, len)
   }
@@ -258,7 +258,7 @@ impl<T: BinaryStorage + Sized> BinaryStorage for TransactionalStorage<T> {
   }
 
   fn is_filled(
-    &mut self, 
+    &self, 
     start: Option<u64>, 
     end: Option<u64>, 
     val: u8

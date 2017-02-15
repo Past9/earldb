@@ -46,12 +46,10 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
     self.storage.close()
   }
 
-  /*
-  pub fn search(&mut self, k: &[u8]) -> Result<LeafNode, Error> {
-    let root = try!(self.storage.read_node(1));
+  pub fn search(&self, k: &[u8]) -> Result<LeafNode, Error> {
+    let root = try!(self.storage.read_node(0));
     self.tree_search(k, root)
   }
-  */
 
   fn is_in_range(&self, k: &[u8], r: &InnerNodeRecord) -> Result<bool, Error> {
     match r.min_key {
@@ -66,33 +64,42 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
     }
   }
 
-  /*
-  fn tree_search(&mut self, k: &[u8], node: Node) -> Result<LeafNode, Error> {
-    match node {
-      Node::leaf(l) => Ok(l),
-      Node::Inner(i) => {
-        len 
-
-
-      }
-    }
-
+  fn tree_search(&self, k: &[u8], node: Node) -> Result<LeafNode, Error> {
     let inner = match node {
-      Node::Leaf(n) => { return Ok(n) },
-      Node::Inner(n) => n 
+      Node::Leaf(l) => { return Ok(l); },
+      Node::Inner(i) => i
     };
 
     try!(AssertionError::assert(inner.len() > 0, ERR_EMPTY_INNER_NODE));
 
-    for r in inner {
-      if try!(self.is_in_range(k, &r)) {
-        let child = try!(self.storage.read_node(r.pointer));
-        return self.tree_search(k, child);
+    for record in inner.into_iter() {
+      match (record.min_key, record.max_key) {
+        // First record
+        (None, Some(max)) => {
+          if k < max.as_slice() { 
+            return self.tree_search(k, try!(self.storage.read_node(record.pointer))); 
+          }
+        },
+        // Any middle record
+        (Some(min), Some(max)) => {
+          if min.as_slice() <= k && k < max.as_slice() { 
+            return self.tree_search(k, try!(self.storage.read_node(record.pointer))); 
+          }
+        },
+        // Last record
+        (Some(min), None) => {
+          if min.as_slice() <= k { 
+            return self.tree_search(k, try!(self.storage.read_node(record.pointer))); 
+          }
+        },
+        // Impossible situation
+        (None, None) => {
+          return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)));
+        }
       }
-    }
+    };
 
     return Err(Error::Assertion(AssertionError::new(ERR_NODE_CORRUPTED)));
   }
-  */
 
 }
