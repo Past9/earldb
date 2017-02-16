@@ -14,10 +14,12 @@ pub static ERR_READ_PAST_INNER_NODE: & 'static str =
   "Tried to read more records from inner node than exist in the node";
 pub static ERR_INNER_NODE_EMPTY: & 'static str = 
   "Encountered an inner node with no records";
-pub static ERR_SEARCH_NO_LEAF: & 'static str = 
-  "Search could not find a leaf node";
+pub static ERR_SEARCH_NO_LEAF_FOR_KEY: & 'static str = 
+  "Search could not find a leaf node for the key";
+pub static ERR_INVALID_NODE_TYPE: & 'static str = 
+  "Node is not marked as either an inner node or a leaf node";
 
-const INNER_NODE_REC_OFFSET: u32 = 0;
+const INNER_NODE_REC_OFFSET: u32 = 13;
 const LEAF_NODE_REC_OFFSET: u32 = 29;
 
 struct LeafRecord {
@@ -43,8 +45,9 @@ struct InnerState {
 #[derive(Clone)]
 struct LeafState {
   pub ptr: u64,
-  pub prev_ptr: u64,
   pub parent_ptr: u64,
+  pub prev_ptr: u64,
+  pub next_ptr: u64,
   pub num_recs: u32,
   pub cur_rec_idx: u32,
 }
@@ -136,8 +139,6 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
     try!(self.enter_node(l.parent_ptr)); 
     self.insert_in_inner(key, new_leaf_ptr);
 
-
-
     Ok(())
   }
 
@@ -216,8 +217,39 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
     Ok(())
   }
 
+  fn alloc_inner(&mut self, parent_ptr: u64) -> Result<u64, Error> {
+
+    let ptr = self.num_nodes * self.node_size as u64;
+
+    try!(self.storage.w_u8(ptr, 0x01)); // Inner node marker
+    try!(self.storage.w_u64(ptr + 1, parent_ptr)); // Pointer to parent node
+    try!(self.storage.w_u32(ptr + 9, 0)); // Number of records in this node 
+
+    self.num_nodes += 1;
+
+    Ok(ptr)
+  }
+
   fn split_inner(&mut self, key: &[u8], ptr: u64) -> Result<(), Error> {
-    unimplemented!();
+    let i = match self.state {
+      State::Inner(ref i) => i.clone(),
+      _ => { return Err(Error::Assertion(AssertionError::new(ERR_USE_INNER_WHERE_NONE))); }
+    };
+
+    let split_idx = i.num_recs / 2;
+    let new_inner_ptr = try!(self.alloc_inner(i.parent_ptr));
+    
+    let split_offset = Self::inner_rec_offset(split_idx, self.key_len) as u64;
+    let len_to_copy = self.node_size as u64 - split_offset;
+
+    let bytes_to_copy = try!(self.storage.r_bytes(i.ptr + split_offset, len_to_copy as usize));
+    try!(self.storage.w_bytes(new_inner_ptr + INNER_NODE_REC_OFFSET as u64, bytes_to_copy.as_slice()));
+    try!(self.storage.fill(Some(i.ptr + split_offset), Some(len_to_copy), 0x0));
+
+    try!(self.enter_node(i.parent_ptr));
+    self.insert_in_inner(key, new_inner_ptr);
+
+    Ok(())
   }
 
   fn insert_in_leaf(&mut self, key: &[u8], val: &[u8]) -> Result<(), Error> {
@@ -293,6 +325,7 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
     // TODO: Implement binary search on leaf node records
     try!(self.search_node(key));
     while let Some(r) = try!(self.next_leaf_rec()) {
+      println!("WHILE");
       if key == r.key.as_slice() { return Ok(Some(r.val)); }
     };
     Ok(None)
@@ -307,7 +340,6 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
       _ => true 
     } {
       match self.state {
-        _ => (),
         State::Nothing() => try!(self.enter_node(0)),
         State::Leaf(ref l) => (),
         State::Inner(_) => {
@@ -328,35 +360,42 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
               }
             }
           }
-        }
+        },
+        _ => ()
       }
     }
 
-    Err(Error::Assertion(AssertionError::new(ERR_SEARCH_NO_LEAF))) 
+    match self.state {
+      State::Leaf(_) => Ok(()),
+      _ => Err(Error::Assertion(AssertionError::new(ERR_SEARCH_NO_LEAF_FOR_KEY))) 
+    }
 
   }
 
   fn enter_node(&mut self, ptr: u64) -> Result<(), Error> {
-    match try!(self.storage.r_bool(ptr)) {
-      true => {
+    match try!(self.storage.r_u8(ptr)) {
+      0x02 => {
         self.state = State::Leaf(LeafState {
           ptr: ptr,
-          prev_ptr: 0,
-          parent_ptr: 0,
-          num_recs: 0,
+          parent_ptr: try!(self.storage.r_u64(ptr + 1)),
+          prev_ptr: try!(self.storage.r_u64(ptr + 9)),
+          next_ptr: try!(self.storage.r_u64(ptr + 17)),
+          num_recs: try!(self.storage.r_u32(ptr + 25)),
           cur_rec_idx: 0
         });
+        Ok(())
       },  
-      false => {
+      0x01 => {
         self.state = State::Inner(InnerState {
           ptr: ptr,
           parent_ptr: 0,
           num_recs: 0,
           cur_rec_idx: 0
         });
-      }
-    };
-    Ok(())
+        Ok(())
+      },
+      _ => Err(Error::Assertion(AssertionError::new(ERR_INVALID_NODE_TYPE)))
+    }
   }
 
   fn inner_rec_offset(rec_idx: u32, key_len: u8) -> u32 {

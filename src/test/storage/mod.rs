@@ -6,3 +6,6 @@ mod transactional_storage_tests;
 mod file_page_tests;
 mod file_synced_buffer_tests;
 mod util_tests;
+mod bplus_tree;
+
+
