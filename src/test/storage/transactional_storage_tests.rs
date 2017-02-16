@@ -373,7 +373,7 @@ pub fn r_str_does_not_read_past_txn_boundary() {
 pub fn fill_fails_when_explicitly_starting_before_txn_boundary() {
   let mut s = new_storage();    
   s.open().unwrap();
-  s.set_txn_boundary(10);
+  s.set_txn_boundary(10).unwrap();
   assert_eq!(
     transactional_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
     s.fill(Some(9), None, 0x1).unwrap_err().description()
@@ -385,7 +385,7 @@ pub fn fill_fails_when_explicitly_starting_before_txn_boundary() {
 pub fn fill_fails_when_implicitly_starting_before_txn_boundary() {
   let mut s = new_storage();    
   s.open().unwrap();
-  s.set_txn_boundary(10);
+  s.set_txn_boundary(10).unwrap();
   assert_eq!(
     transactional_storage::ERR_WRITE_BEFORE_TXN_BOUNDARY,
     s.fill(None, None, 0x1).unwrap_err().description()
@@ -397,7 +397,7 @@ pub fn fill_fails_when_implicitly_starting_before_txn_boundary() {
 pub fn fill_writes_bytes_in_range() {
   let mut s = new_storage();    
   s.open().unwrap();
-  s.set_txn_boundary(10);
+  s.set_txn_boundary(10).unwrap();
   s.fill(Some(10), Some(20), 0x1).unwrap();
   assert!(s.is_filled(None, Some(10), 0x0).unwrap());
   assert!(s.is_filled(Some(10), Some(20), 0x1).unwrap());

@@ -20,7 +20,7 @@ const RECORDS_LEN_OFFSET: usize = 9;
 // u32 size
 const RECORDS_LEN_SIZE: usize = 4; 
 // Start of records, RECORDS_LEN_OFFSET + RECORDS_LEN_SIZE
-const RECORD_START_OFFSET: usize = 9; 
+const RECORD_START_OFFSET: usize = 13; 
 // u64 size
 const PTR_LEN: usize = 8; 
 
@@ -94,7 +94,31 @@ impl InnerNode {
   }
 
   pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
-    unimplemented!();
+    let mut bytes: Vec<u8> = Vec::new();
+    bytes.push(0x1);
+    try!(bytes.write_u64::<LittleEndian>(self.parent_ptr));
+    let record_len = self.key_len as usize * self.keys.len() * self.pointers.len() * 8; 
+    try!(bytes.write_u32::<LittleEndian>(record_len as u32));
+
+    let mut more = self.len() > 0;
+    let mut next_is_ptr = true;
+    let mut key_iter = self.keys.iter();
+    let mut ptr_iter = self.pointers.iter();
+
+    while true {
+      match next_is_ptr {
+        true => if let Some(p) = ptr_iter.next() {
+            bytes.write_u64::<LittleEndian>(p.clone());
+        },
+        false => if let Some(k) = key_iter.next() {
+            bytes.extend(k.clone());
+        }
+      };
+      next_is_ptr = !next_is_ptr;
+    }
+    
+
+    Ok(bytes)
   }
 
   pub fn node_ptr(&self) -> u64 { self.node_ptr }

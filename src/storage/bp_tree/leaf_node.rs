@@ -1,9 +1,12 @@
+use std::cell::RefCell;
 use std::io::{ Read, Cursor };
 
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
 use error::{ Error, AssertionError };
+use storage::binary_storage::BinaryStorage;
 use storage::bp_tree::node;
+use storage::bp_tree::bp_storage::{ NodeData, BPStorage };
 
 // Node type symbol is at the beginning of the node
 const NODE_TYPE_OFFSET: usize = 0;
@@ -29,7 +32,6 @@ const RECORDS_LEN_SIZE: usize = 4;
 const RECORD_START_OFFSET: usize = 29; 
 
 pub struct LeafNode {
-  storage: BPStorage,
   node_ptr: u64,
   parent_ptr: u64,
   node_size: u32,
@@ -43,12 +45,34 @@ pub struct LeafNode {
 }
 impl LeafNode {
 
+  pub fn new_empty(
+    parent_ptr: u64,
+    node_size: u32,
+    key_len: u8,
+    val_len: u8,
+    prev_ptr: u64,
+    next_ptr: u64,
+    capacity: u64
+  ) -> LeafNode {
+    LeafNode {
+      node_ptr: 0,
+      parent_ptr: parent_ptr,
+      node_size: node_size,
+      keys: Vec::new(),
+      vals: Vec::new(),
+      key_len: key_len,
+      val_len: val_len,
+      prev_ptr: prev_ptr,
+      next_ptr: next_ptr,
+      capacity: capacity
+    }
+  }
+
   pub fn from_bytes(
-    storage: BPStorage,
     data: &[u8],
     node_ptr: u64,
     key_len: u8,
-    val_len: u8
+    val_len: u8,
   ) -> Result<LeafNode, Error> {
 
     let node_size = data.len() as u32;
@@ -92,7 +116,6 @@ impl LeafNode {
     }
 
     Ok(LeafNode {
-      storage: storage,
       node_ptr: node_ptr,
       parent_ptr: parent_ptr,
       node_size: node_size,
@@ -106,19 +129,37 @@ impl LeafNode {
     })
   }
 
-  pub fn insert(&mut self, k: &[u8], v: &[u8]) -> Result<(), Error> {
+  pub fn insert(&mut self, changes: &mut Vec<NodeData>, k: &[u8], v: &[u8]) -> Result<(), Error> {
     match self.is_full() {
       true => {
         unimplemented!();
       },
       false => {
-        self.insert_record(k, v);
+        try!(self.insert_record(changes, k, v));
       }
     }
-    self.storage.save_leaf(self);
+    // TODO: save node
+    //self.storage.save_leaf(self);
+    Ok(())
   }
 
-  fn insert_record(&mut self, k: &[u8], v: &[u8]) {
+  pub fn split(&mut self, changes: &mut Vec<NodeData>) -> Result<(), Error> {
+    let split_idx = self.keys.len() / 2;
+    let split_keys = self.keys.split_off(split_idx);
+    let split_vals = self.vals.split_off(split_idx);
+    /*
+    let new_leaf = Leaf::new_empty(
+      self.parent_ptr, 
+      self.node_size,
+      self.key_len,
+      self.val_len,
+      self.node_ptr,
+      0,
+      */
+    Ok(())
+  }
+
+  fn insert_record(&mut self, changes: &mut Vec<NodeData>, k: &[u8], v: &[u8]) -> Result<(), Error> {
     for i in 0..self.len() {
       let key = self.keys[i].clone();
       let key_slice = key.as_slice();
@@ -138,10 +179,26 @@ impl LeafNode {
         self.vals.insert(i, v.to_vec()); 
       }
     }
+    changes.push(NodeData {
+      ptr: self.parent_ptr,
+      req_alloc: false,
+      data: try!(self.to_bytes())
+    });
+    Ok(())
   }
 
   pub fn to_bytes(&self) -> Result<Vec<u8>, Error> {
-    unimplemented!();
+    let mut bytes: Vec<u8> = Vec::new();
+    bytes.push(0x2);
+    try!(bytes.write_u64::<LittleEndian>(self.parent_ptr));
+    try!(bytes.write_u64::<LittleEndian>(self.prev_ptr));
+    try!(bytes.write_u64::<LittleEndian>(self.next_ptr));
+    try!(bytes.write_u32::<LittleEndian>(self.node_size));
+    for i in 0..self.len() {
+      bytes.extend(self.keys[i].clone());
+      bytes.extend(self.vals[i].clone());
+    }
+    Ok(bytes)
   }
 
   pub fn node_ptr(&self) -> u64 { self.node_ptr }

@@ -458,7 +458,7 @@ pub fn w_str_over_capacity_expands_storage_multiple_times<T: BinaryStorage>(
 }
 
 // r_i8() tests
-pub fn r_i8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_i8_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -506,7 +506,7 @@ pub fn r_i8_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: T
 }
 
 // r_i16() tests
-pub fn r_i16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_i16_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -553,7 +553,7 @@ pub fn r_i16_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_i32() tests
-pub fn r_i32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_i32_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -600,7 +600,7 @@ pub fn r_i32_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_i64() tests
-pub fn r_i64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_i64_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -647,7 +647,7 @@ pub fn r_i64_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_u8() tests
-pub fn r_u8_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_u8_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -694,7 +694,7 @@ pub fn r_u8_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: T
 }
 
 // r_u16() tests
-pub fn r_u16_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_u16_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -741,7 +741,7 @@ pub fn r_u16_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_u32() tests
-pub fn r_u32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_u32_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -788,7 +788,7 @@ pub fn r_u32_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_u64() tests
-pub fn r_u64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_u64_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -835,7 +835,7 @@ pub fn r_u64_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_f32() tests
-pub fn r_f32_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_f32_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -882,7 +882,7 @@ pub fn r_f32_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_f64() tests
-pub fn r_f64_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_f64_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -929,7 +929,7 @@ pub fn r_f64_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s: 
 }
 
 // r_bool() tests
-pub fn r_bool_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_bool_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -976,7 +976,7 @@ pub fn r_bool_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(mut s:
 }
 
 // r_bytes() tests
-pub fn r_bytes_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_bytes_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1025,7 +1025,7 @@ pub fn r_bytes_result_is_not_mutated_on_subsequent_write<T: BinaryStorage>(
 }
 
 // r_str() tests
-pub fn r_str_returns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn r_str_returns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,
@@ -1161,7 +1161,7 @@ pub fn fill_does_not_expand_capacity<T: BinaryStorage>(mut s: T) {
 }
 
 // is_filled() tests
-pub fn is_filled_retuns_err_when_closed<T: BinaryStorage>(mut s: T) {
+pub fn is_filled_retuns_err_when_closed<T: BinaryStorage>(s: T) {
   assert!(!s.is_open());
   assert_eq!(
     binary_storage::ERR_OPERATION_INVALID_WHEN_CLOSED,

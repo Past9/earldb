@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use error::Error;
 
 use storage::binary_storage::BinaryStorage;
@@ -5,18 +6,24 @@ use storage::bp_tree::node::Node;
 use storage::bp_tree::inner_node::InnerNode;
 use storage::bp_tree::leaf_node::LeafNode;
 
+pub struct NodeData {
+  pub ptr: u64,
+  pub req_alloc: bool,
+  pub data: Vec<u8>
+}
+
 
 pub struct BPStorage<T: BinaryStorage + Sized> {
-  storage: T,
   node_size: u64,
   key_len: u8,
   val_len: u8,
-  num_nodes: u64
+  num_nodes: u64,
+  storage: T
 }
 impl<T: BinaryStorage + Sized> BPStorage<T> {
 
   pub fn new(
-    mut storage: T, 
+    storage: T, 
     node_size: u64, 
     key_len: u8, 
     val_len: u8
@@ -46,19 +53,23 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
     Node::from_bytes(data.as_slice(), node_ptr, self.key_len, self.val_len)
   }
 
-  pub fn alloc(&self) -> Result<u64, Error> {
+  pub fn alloc(&mut self) -> Result<u64, Error> {
     let ptr = self.num_nodes * self.node_size;
     self.num_nodes += 1;
+    match self.storage.expand(ptr + self.node_size) {
+      Ok(_) => Ok(ptr),
+      Err(e) => Err(e)
+    }
   }
 
-  pub fn save_leaf(&mut self, node: LeafNode) -> Result<(), Error> {
-    let data = try!(node.to_bytes());
+  pub fn save_node(&mut self, node: NodeData) -> Result<(), Error> {
     self.storage.w_bytes(
-      node.node_ptr(), 
-      data.as_slice()
+      node.ptr, 
+      node.data.as_slice()
     )
   }
 
+  /*
   pub fn save_inner(&mut self, node: InnerNode) -> Result<(), Error> {
     let data = try!(node.to_bytes());
     self.storage.w_bytes(
@@ -66,5 +77,6 @@ impl<T: BinaryStorage + Sized> BPStorage<T> {
       data.as_slice()
     )
   }
+  */
 
 }

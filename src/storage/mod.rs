@@ -7,4 +7,5 @@ pub mod file_binary_storage;
 pub mod transactional_storage;
 pub mod journal;
 pub mod ptr_index;
-pub mod bp_tree;
+//pub mod bp_tree;
+pub mod bplus_tree;

@@ -1,7 +1,8 @@
+use std::cell::RefCell;
 use error::{ Error, AssertionError };
 
 use storage::binary_storage::BinaryStorage;
-use storage::bp_tree::bp_storage::BPStorage;
+use storage::bp_tree::bp_storage::{ NodeData, BPStorage };
 use storage::bp_tree::node::Node;
 use storage::bp_tree::inner_node::{ InnerNode, InnerNodeRecord };
 use storage::bp_tree::leaf_node::LeafNode;
@@ -12,25 +13,25 @@ pub static ERR_KEY_WRONG_LEN: & 'static str = "Key is the wrong length";
 pub static ERR_VAL_WRONG_LEN: & 'static str = "Value is the wrong length";
 
 pub struct BPTree<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> {
-  storage: BPStorage<T>,
   node_size: u64,
   key_len: u8,
   val_len: u8,
-  key_cmp: F // returns true if GTE
+  key_cmp: F, // returns true if GTE
+  storage: BPStorage<T>
 }
 impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
 
   pub fn new(
-    mut storage: T, 
+    storage: T, 
     node_size: u64, 
     key_len: u8, 
     val_len: u8, 
     key_cmp: F
   ) -> BPTree<T, F> {
-    let bp_storage = BPStorage::new(storage, node_size, key_len, val_len);
+    //let bp_storage = BPStorage::new(storage, node_size, key_len, val_len);
 
     BPTree {
-      storage: bp_storage,
+      storage: BPStorage::new(storage, node_size, key_len, val_len),
       node_size: node_size,
       key_len: key_len,
       val_len: val_len,
@@ -67,7 +68,14 @@ impl<T: BinaryStorage + Sized, F: Fn(&[u8], &[u8]) -> bool> BPTree<T, F> {
     try!(AssertionError::assert(k.len() == self.key_len as usize, ERR_KEY_WRONG_LEN));
     try!(AssertionError::assert(v.len() == self.val_len as usize, ERR_VAL_WRONG_LEN));
     match self.search_node(k) {
-      Ok(mut leaf) => leaf.insert(k, v),
+      Ok(mut leaf) => {
+        let mut changes : Vec<NodeData> = Vec::new();
+        try!(leaf.insert(&mut changes, k, v));
+        for c in changes {
+          try!(self.storage.save_node(c));
+        }
+        Ok(())
+      },
       Err(e) => Err(e)
     }
   }

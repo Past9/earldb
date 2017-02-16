@@ -3,6 +3,7 @@ use std::io::Cursor;
 use byteorder::{ LittleEndian, ReadBytesExt, WriteBytesExt };
 
 use error::{ Error, AssertionError };
+use storage::binary_storage::BinaryStorage;
 use storage::bp_tree::inner_node::InnerNode;
 use storage::bp_tree::leaf_node::LeafNode;
 
