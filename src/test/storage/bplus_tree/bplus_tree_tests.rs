@@ -28,7 +28,9 @@ pub fn inserts_and_finds() {
 
   t.open().unwrap();
 
-  assert_eq!(vec!(0xfe), t.search(&[0x02]).unwrap().unwrap());
+  t.insert(&[0x02], &[0x88]).unwrap();
+
+  assert_eq!(vec!(0x88), t.search(&[0x02]).unwrap().unwrap());
 
 }
 

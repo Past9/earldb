@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Launch",
+      "program": "${workspaceRoot}/../../.cargo/bin/cargo",
+      "args": [],
+      "cwd": "${workspaceRoot}"
+    },
+    {
+      "type": "lldb-mi",
+      "request": "launch",
+      "name": "Launch Program",
+      "target": "./target/debug/deps/earldb-cdafb1342b5f2f36",
+      "cwd": "${workspaceRoot}",
+      "arguments": "test"
+    },
+    {
+      "type": "gdb",
+      "request": "launch",
+      "name": "cargo test",
+      "target": "../../.cargo/bin/cargo",
+      "cwd": "${workspaceRoot}",
+      "arguments": "test",
+      "gdbpath": "/home/past9/.cargo/bin/rust-gdb",
+      "autorun": [
+        "break ${workspaceRoot}/src/test/storage/bplus_tree/bplus_tree_tests.rs:9"
+      ]
+    }
+  ]
+}

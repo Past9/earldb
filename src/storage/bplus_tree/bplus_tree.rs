@@ -218,7 +218,6 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   }
 
   fn alloc_inner(&mut self, parent_ptr: u64) -> Result<u64, Error> {
-
     let ptr = self.num_nodes * self.node_size as u64;
 
     try!(self.storage.w_u8(ptr, 0x01)); // Inner node marker
@@ -253,7 +252,6 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   }
 
   fn insert_in_leaf(&mut self, key: &[u8], val: &[u8]) -> Result<(), Error> {
-
     let mut i = 0;
     let mut min_key: Option<Vec<u8>> = None;
     let mut max_key: Option<Vec<u8>> = None;
@@ -274,14 +272,14 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
         },
         (Some(min), Some(max)) => {
           if key == min.as_slice() {
-            try!(self.overwrite_in_leaf_at_idx(i, key, val));
+            try!(self.overwrite_in_leaf_at_idx(i - 1, key, val));
           } else if min.as_slice() < key && key < max.as_slice() {
             try!(self.insert_in_leaf_at_idx(i, key, val));
           }
         },
         (Some(min), None) => {
           if key == min.as_slice() {
-            try!(self.overwrite_in_leaf_at_idx(i, key, val));
+            try!(self.overwrite_in_leaf_at_idx(i - 1, key, val));
           } else if min.as_slice() < key {
             try!(self.insert_in_leaf_at_idx(i, key, val));
           }
@@ -325,7 +323,6 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
     // TODO: Implement binary search on leaf node records
     try!(self.search_node(key));
     while let Some(r) = try!(self.next_leaf_rec()) {
-      println!("WHILE");
       if key == r.key.as_slice() { return Ok(Some(r.val)); }
     };
     Ok(None)
@@ -425,7 +422,7 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   fn inner_is_full(&mut self) -> Result<bool, Error> {
     match self.state {
       State::Inner(ref i) => Ok(
-        Self::inner_max_records(self.node_size, self.key_len) > i.num_recs
+        Self::inner_max_records(self.node_size, self.key_len) <= i.num_recs
       ),
       _ => Err(Error::Assertion(AssertionError::new(ERR_USE_INNER_WHERE_NONE)))
     }
@@ -434,7 +431,7 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   fn leaf_is_full(&mut self) -> Result<bool, Error> {
     match self.state {
       State::Leaf(ref l) => Ok(
-        Self::leaf_max_records(self.node_size, self.key_len, self.val_len) > l.num_recs
+        Self::leaf_max_records(self.node_size, self.key_len, self.val_len) <= l.num_recs
       ),
       _ => Err(Error::Assertion(AssertionError::new(ERR_USE_LEAF_WHERE_NONE)))
     }
