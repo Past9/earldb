@@ -10,8 +10,8 @@ use storage::transactional_storage::TransactionalStorage;
 use storage::memory_binary_storage::MemoryBinaryStorage;
 
 fn new_storage(
-  initial_capacity: u64, 
-  expand_size: u64
+  initial_capacity: usize, 
+  expand_size: usize
 ) -> TransactionalStorage<MemoryBinaryStorage> {
   TransactionalStorage::new(
     MemoryBinaryStorage::new(initial_capacity, expand_size).unwrap()

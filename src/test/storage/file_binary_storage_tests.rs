@@ -34,7 +34,7 @@ fn get_storage() -> (FileBinaryStorage, String) {
   (s, path)
 }
 
-fn get_storage_expand_size(expand_size: u64) -> (FileBinaryStorage, String) {
+fn get_storage_expand_size(expand_size: usize) -> (FileBinaryStorage, String) {
   let path = rnd_path();
   let s = FileBinaryStorage::new(
     path.clone(),

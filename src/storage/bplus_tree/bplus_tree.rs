@@ -97,12 +97,28 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   pub fn insert(&mut self, key: &[u8], val: &[u8]) -> Result<(), Error> {
     try!(self.search_node(key));
 
+    println!("LIF {0}", try!(self.leaf_is_full()));
+
     match try!(self.leaf_is_full()) {
       true => try!(self.split_leaf(key, val)),
       false => try!(self.insert_in_leaf(key, val))
     };
 
     Ok(())
+  }
+
+  fn get_leaf_state(&self) -> Result<LeafState, Error> {
+    match self.state {
+      State::Leaf(s) => Ok(s),
+      _ => { return Err(Error::Assertion(AssertionError::new(ERR_USE_LEAF_WHERE_NONE))); }
+    }
+  }
+
+  fn get_inner_state(&self) -> Result<InnerState, Error> {
+    match self.state {
+      State::Inner(s) => Ok(s),
+      _ => { return Err(Error::Assertion(AssertionError::new(ERR_USE_INNER_WHERE_NONE))); }
+    }
   }
 
   fn alloc_leaf(&mut self, prev_ptr: u64, parent_ptr: u64) -> Result<u64, Error> {
@@ -121,10 +137,8 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   }
 
   fn split_leaf(&mut self, key: &[u8], val: &[u8]) -> Result<(), Error> {
-    let l = match self.state {
-      State::Leaf(ref l) => l.clone(),
-      _ => { return Err(Error::Assertion(AssertionError::new(ERR_USE_LEAF_WHERE_NONE))); }
-    };
+    println!("SPLIT LEAF");
+    let l = try!(self.get_leaf_state());
 
     let split_idx = l.num_recs / 2;
     let new_leaf_ptr = try!(self.alloc_leaf(l.ptr, l.parent_ptr));
@@ -143,10 +157,7 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   }
 
   fn insert_in_inner(&mut self, key: &[u8], ptr: u64) -> Result<(), Error> {
-    let i = match self.state {
-      State::Inner(ref i) => i.clone(),
-      _ => { return Err(Error::Assertion(AssertionError::new(ERR_USE_INNER_WHERE_NONE))); }
-    };
+    let i = try!(self.get_inner_state());
 
     match try!(self.inner_is_full()) {
       true => try!(self.split_inner(key, ptr)),
@@ -207,7 +218,7 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
     let bytes_to_move = try!(self.storage.r_bytes(rec_offset, len_to_move as usize));
     try!(self.storage.w_bytes(rec_offset + rec_size, bytes_to_move.as_slice()));
     try!(self.overwrite_in_inner_at_idx(idx, key, ptr));
-     Ok(())
+    Ok(())
   }
 
   fn overwrite_in_inner_at_idx(&mut self, idx: u32, key: &[u8], ptr: u64) -> Result<(), Error> {
@@ -230,10 +241,7 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   }
 
   fn split_inner(&mut self, key: &[u8], ptr: u64) -> Result<(), Error> {
-    let i = match self.state {
-      State::Inner(ref i) => i.clone(),
-      _ => { return Err(Error::Assertion(AssertionError::new(ERR_USE_INNER_WHERE_NONE))); }
-    };
+    let i = try!(self.get_inner_state());
 
     let split_idx = i.num_recs / 2;
     let new_inner_ptr = try!(self.alloc_inner(i.parent_ptr));
@@ -268,20 +276,25 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
         (None, Some(max)) => {
           if key < max.as_slice() {
             try!(self.insert_in_leaf_at_idx(i, key, val));
+            stop = true;
           }
         },
         (Some(min), Some(max)) => {
           if key == min.as_slice() {
             try!(self.overwrite_in_leaf_at_idx(i - 1, key, val));
+            stop = true;
           } else if min.as_slice() < key && key < max.as_slice() {
             try!(self.insert_in_leaf_at_idx(i, key, val));
+            stop = true;
           }
         },
         (Some(min), None) => {
           if key == min.as_slice() {
             try!(self.overwrite_in_leaf_at_idx(i - 1, key, val));
+            stop = true;
           } else if min.as_slice() < key {
             try!(self.insert_in_leaf_at_idx(i, key, val));
+            stop = true;
           }
         },
         (None, None) => {
@@ -429,80 +442,64 @@ impl<T: BinaryStorage + Sized> BPlusTree<T> {
   }
 
   fn leaf_is_full(&mut self) -> Result<bool, Error> {
-    match self.state {
-      State::Leaf(ref l) => Ok(
-        Self::leaf_max_records(self.node_size, self.key_len, self.val_len) <= l.num_recs
-      ),
-      _ => Err(Error::Assertion(AssertionError::new(ERR_USE_LEAF_WHERE_NONE)))
-    }
+    let l = try!(self.get_leaf_state());
+    Ok(Self::leaf_max_records(self.node_size, self.key_len, self.val_len) <= l.num_recs)
   }
 
   fn next_leaf_rec(&mut self) -> Result<Option<LeafRecord>, Error> {
-    match self.state {
-      State::Leaf(ref mut l) => {
-        match l.cur_rec_idx < l.num_recs {
-          false => Ok(None),
-          true => {
-            let rec_offset = Self::leaf_rec_offset(l.cur_rec_idx, self.key_len, self.val_len) as u64;
+    let mut l = try!(self.get_leaf_state());
+    match l.cur_rec_idx < l.num_recs {
+      false => Ok(None),
+      true => {
+        let rec_offset = Self::leaf_rec_offset(l.cur_rec_idx, self.key_len, self.val_len) as u64;
 
-            let leaf_idx = l.cur_rec_idx;
-            let key = try!(self.storage.r_bytes(rec_offset, self.key_len as usize));
-            let val = try!(self.storage.r_bytes(rec_offset + self.key_len as u64, self.key_len as usize));
+        let leaf_idx = l.cur_rec_idx;
+        let key = try!(self.storage.r_bytes(rec_offset, self.key_len as usize));
+        let val = try!(self.storage.r_bytes(rec_offset + self.key_len as u64, self.key_len as usize));
 
-            l.cur_rec_idx += 1;
+        l.cur_rec_idx += 1;
 
-            Ok(Some(LeafRecord {
-              leaf_idx: leaf_idx,
-              key: key,
-              val: val
-            }))
-          }
-        }
-      },
-      _ => Err(Error::Assertion(AssertionError::new(ERR_USE_LEAF_WHERE_NONE)))
+        Ok(Some(LeafRecord {
+          leaf_idx: leaf_idx,
+          key: key,
+          val: val
+        }))
+      }
     }
   }
 
   fn next_inner_rec(&mut self) -> Result<Option<InnerRecord>, Error> {
-    match self.state {
-      State::Inner(ref mut i) => {
-        match i.cur_rec_idx < i.num_recs {
-          false => Ok(None),
-          true => {
-            let rec_offset = Self::inner_rec_offset(i.cur_rec_idx, self.key_len) as u64;
+    let mut i = try!(self.get_inner_state());
 
-            let mut min_key: Option<Vec<u8>> = None;
-            if i.cur_rec_idx > 0 {
-              min_key = Some(try!(self.storage.r_bytes(
-                rec_offset - self.key_len as u64,
-                self.key_len as usize
-              )));
-            }
+    if i.cur_rec_idx >= i.num_recs { return Ok(None); }
 
-            let ptr = try!(self.storage.r_u64(rec_offset));
+    let rec_offset = Self::inner_rec_offset(i.cur_rec_idx, self.key_len) as u64;
 
-            let mut max_key: Option<Vec<u8>> = None;
-            if i.cur_rec_idx < i.num_recs {
-              max_key = Some(try!(self.storage.r_bytes(
-                rec_offset + 8,
-                self.key_len as usize
-              )));
-            }
-
-            i.cur_rec_idx += 1;
-
-            Ok(Some(InnerRecord {
-              min_key: min_key,
-              ptr: ptr,
-              max_key: max_key,
-            }))
-          }
-        }
-      }
-      _ => Err(Error::Assertion(AssertionError::new(ERR_USE_INNER_WHERE_NONE)))
+    let mut min_key: Option<Vec<u8>> = None;
+    if i.cur_rec_idx > 0 {
+      min_key = Some(try!(self.storage.r_bytes(
+        rec_offset - self.key_len as u64,
+        self.key_len as usize
+      )));
     }
+
+    let ptr = try!(self.storage.r_u64(rec_offset));
+
+    let mut max_key: Option<Vec<u8>> = None;
+    if i.cur_rec_idx < i.num_recs {
+      max_key = Some(try!(self.storage.r_bytes(
+        rec_offset + 8,
+        self.key_len as usize
+      )));
+    }
+
+    i.cur_rec_idx += 1;
+
+    Ok(Some(InnerRecord {
+      min_key: min_key,
+      ptr: ptr,
+      max_key: max_key,
+    }))
   }
-
-
 
 }

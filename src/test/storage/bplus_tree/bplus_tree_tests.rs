@@ -28,9 +28,24 @@ pub fn inserts_and_finds() {
 
   t.open().unwrap();
 
+/*
   t.insert(&[0x02], &[0x88]).unwrap();
+  t.insert(&[0x03], &[0x89]).unwrap();
+  */
+  t.insert(&[0x04], &[0x8a]).unwrap();
+  t.insert(&[0x05], &[0x8b]).unwrap();
+  t.insert(&[0x06], &[0x8c]).unwrap();
+  //t.insert(&[0x05], &[0x8b]).unwrap();
 
+  //assert_eq!(true, false);
+
+/*
+  assert_eq!(vec!(0xff), t.search(&[0x01]).unwrap().unwrap());
   assert_eq!(vec!(0x88), t.search(&[0x02]).unwrap().unwrap());
+  assert_eq!(vec!(0x89), t.search(&[0x03]).unwrap().unwrap());
+  */
+  //assert_eq!(vec!(0x8a), t.search(&[0x04]).unwrap().unwrap());
+  //assert_eq!(vec!(0x8b), t.search(&[0x05]).unwrap().unwrap());
 
 }
 

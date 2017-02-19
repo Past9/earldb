@@ -1373,14 +1373,14 @@ pub fn expand_returns_err_when_allocation_arithmetic_overflows<T: BinaryStorage>
   s.open().unwrap();
   assert_eq!(
     binary_storage::ERR_ARITHMETIC_OVERFLOW,
-    s.expand(u64::max_value()).unwrap_err().description()
+    s.expand(usize::max_value()).unwrap_err().description()
   );
 }
 
 pub fn expand_does_not_change_capacity_when_allocation_arithmetic_overflows
  <T: BinaryStorage>(mut s: T) {
   s.open().unwrap();
-  s.expand(u64::max_value()).unwrap_err();
+  s.expand(usize::max_value()).unwrap_err();
   assert_eq!(256, s.get_capacity().unwrap());
 }
 
@@ -1388,7 +1388,7 @@ pub fn expand_returns_err_when_allocation_fails<T: BinaryStorage>(mut s: T) {
   s.open().unwrap();
   assert_eq!(
     binary_storage::ERR_STORAGE_ALLOC,
-    s.expand(u64::max_value() - 1024).unwrap_err().description()
+    s.expand(usize::max_value() - 1024).unwrap_err().description()
   );
 }
 
@@ -1396,7 +1396,7 @@ pub fn expand_does_not_change_capacity_when_allocation_fails<T: BinaryStorage>(
   mut s: T
 ) {
   s.open().unwrap();
-  s.expand(u64::max_value() - 1024).unwrap_err();
+  s.expand(usize::max_value() - 1024).unwrap_err();
   assert_eq!(256, s.get_capacity().unwrap());
 }
 

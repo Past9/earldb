@@ -18,17 +18,19 @@ pub static ERR_NO_RECORD_DATA: & 'static str =
   "Record contains no data";
 pub static ERR_CHECKSUM_MISMATCH: & 'static str =
   "Checksum mismatch, record data may be corrupted";
+pub static ERR_WRITE_TOO_BIG: & 'static str =
+  "Data cannot be more than 4294967295 bytes long";
 
-pub const PRE_DATA_LEN: u64 = 6;
-pub const POST_DATA_LEN: u64 = 3;
+pub const PRE_DATA_LEN: usize = 6;
+pub const POST_DATA_LEN: usize = 3;
 
 pub struct Journal<T: BinaryStorage + Sized> {
   storage: TransactionalStorage<T>,
-  read_offset: u64,
-  write_offset: u64,
+  read_offset: usize,
+  write_offset: usize,
   is_writing: bool,
-  uncommitted_size: u64,
-  record_count: u64
+  uncommitted_size: usize,
+  record_count: usize
 }
 impl<T: BinaryStorage + Sized> Journal<T> {
 
@@ -101,10 +103,10 @@ impl<T: BinaryStorage + Sized> Journal<T> {
         }
       };
       self.write_offset = self.read_offset + 
-        mem::size_of::<u16>() as u64 + 
-        mem::size_of::<u32>() as u64 + 
-        data.len() as u64 +
-        mem::size_of::<u8>() as u64; 
+        mem::size_of::<u16>() + 
+        mem::size_of::<u32>() + 
+        data.len() +
+        mem::size_of::<u8>(); 
       self.is_writing = true;
     }
 
@@ -121,13 +123,17 @@ impl<T: BinaryStorage + Sized> Journal<T> {
     // TODO: constrain data size
     try!(AssertionError::assert_not(self.is_writing, ERR_WRITE_IN_PROGRESS));
     try!(AssertionError::assert(data.len() > 0, ERR_NOTHING_TO_WRITE));
+    try!(AssertionError::assert_not(
+      data.len() > mem::size_of::<u32>(),
+      ERR_WRITE_TOO_BIG
+    ));
 
     self.is_writing = true;
 
     match self.storage.w_u16(self.write_offset, 514) {
       Ok(()) =>  {
-        self.write_offset += mem::size_of::<u16>() as u64;
-        self.uncommitted_size = mem::size_of::<u16>() as u64;
+        self.write_offset += mem::size_of::<u16>();
+        self.uncommitted_size = mem::size_of::<u16>();
       },
       Err(e) => match self.discard() {
         Ok(()) => return Err(e),
@@ -136,12 +142,12 @@ impl<T: BinaryStorage + Sized> Journal<T> {
     };
 
     // Length of data plus checksum byte
-    let len = data.len() as u64;
+    let len = data.len();
 
     match self.storage.w_u32(self.write_offset, len as u32) {
       Ok(()) => {
-        self.write_offset += mem::size_of::<u32>() as u64;
-        self.uncommitted_size += mem::size_of::<u32>() as u64;
+        self.write_offset += mem::size_of::<u32>();
+        self.uncommitted_size += mem::size_of::<u32>();
       },
       Err(e) => match self.discard() {
         Ok(()) => return Err(e),
@@ -162,8 +168,8 @@ impl<T: BinaryStorage + Sized> Journal<T> {
 
     match self.storage.w_u8(self.write_offset, xor_checksum(data)) {
       Ok(()) =>  {
-        self.write_offset += mem::size_of::<u8>() as u64;
-        self.uncommitted_size += mem::size_of::<u8>() as u64;
+        self.write_offset += mem::size_of::<u8>();
+        self.uncommitted_size += mem::size_of::<u8>();
       },
       Err(e) => match self.discard() {
         Ok(()) => return Err(e),
@@ -179,8 +185,8 @@ impl<T: BinaryStorage + Sized> Journal<T> {
 
     match self.storage.w_u16(self.write_offset, 771) {
       Ok(()) =>  {
-        self.write_offset += mem::size_of::<u16>() as u64;
-        self.uncommitted_size += mem::size_of::<u16>() as u64;
+        self.write_offset += mem::size_of::<u16>();
+        self.uncommitted_size += mem::size_of::<u16>();
       },
       Err(e) => match self.discard() {
         Ok(()) => return Err(e),
@@ -225,14 +231,14 @@ impl<T: BinaryStorage + Sized> Journal<T> {
 
   pub fn has_end(&mut self) -> Result<bool, Error> {
     let len = try!
-      (self.storage.r_u32(self.read_offset + mem::size_of::<u16>() as u64)
-    );
+      (self.storage.r_u32(self.read_offset + mem::size_of::<u16>())
+    ) as usize;
     Ok(
       771 == try!(self.storage.r_u16(
         self.read_offset + 
           PRE_DATA_LEN +
-          len as u64 +
-          mem::size_of::<u8>() as u64
+          len +
+          mem::size_of::<u8>() 
       ))
     )
   }
@@ -240,7 +246,7 @@ impl<T: BinaryStorage + Sized> Journal<T> {
   pub fn read(&mut self) -> Result<Vec<u8>, Error> {
 
     let len = try!(
-      self.storage.r_u32(self.read_offset + mem::size_of::<u16>() as u64)
+      self.storage.r_u32(self.read_offset + mem::size_of::<u16>())
     ) as usize;
     try!(AssertionError::assert(len > 1, ERR_NO_RECORD_DATA));
     let mut bytes = try!(self.storage.r_bytes(
@@ -261,7 +267,7 @@ impl<T: BinaryStorage + Sized> Journal<T> {
     Ok(bytes)
   }
 
-  pub fn jump_to(&mut self, offset: u64) -> Result<(), Error> {
+  pub fn jump_to(&mut self, offset: usize) -> Result<(), Error> {
     self.read_offset = offset;
 
     match self.has_start() {
@@ -290,15 +296,15 @@ impl<T: BinaryStorage + Sized> Journal<T> {
   }
 
 
-  pub fn read_offset(&self) -> u64 { self.read_offset }
+  pub fn read_offset(&self) -> usize { self.read_offset }
 
-  pub fn write_offset(&self) -> u64 { self.write_offset }
+  pub fn write_offset(&self) -> usize { self.write_offset }
 
-  pub fn capacity(&self) -> Result<u64, Error> { self.storage.get_capacity() }
+  pub fn capacity(&self) -> Result<usize, Error> { self.storage.get_capacity() }
 
-  pub fn record_count(&self) -> u64 { self.record_count }
+  pub fn record_count(&self) -> usize { self.record_count }
 
-  pub fn txn_boundary(&self) -> Result<u64, Error> {
+  pub fn txn_boundary(&self) -> Result<usize, Error> {
     self.storage.get_txn_boundary()
   }
 
@@ -319,7 +325,7 @@ impl<T: BinaryStorage + Sized> Iterator for Journal<T> {
 
         let new_offset = self.read_offset + 
           PRE_DATA_LEN + 
-          v.len() as u64 +
+          v.len() +
           POST_DATA_LEN;
 
         match self.jump_to(new_offset) {
